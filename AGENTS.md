@@ -29,7 +29,10 @@ crypto-sample-ts/
 │   └── utils/              # ユーティリティ関数
 ├── tests/                  # テストファイル
 ├── docs/                   # ドキュメント
-└── package.json
+├── package.json            # プロジェクトの依存関係とスクリプト
+├── tsconfig.json           # TypeScriptの設定
+├── biome.json              # リンター・フォーマッターの設定
+└── .gitignore              # Gitの除外設定
 ```
 
 ## サンプルコード作成の方針
