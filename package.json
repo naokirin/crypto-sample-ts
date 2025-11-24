@@ -12,19 +12,16 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write ."
   },
-  "keywords": [
-    "cryptography",
-    "typescript",
-    "encryption",
-    "security"
-  ],
+  "keywords": ["cryptography", "typescript", "encryption", "security"],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.4"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@noble/ciphers": "^2.0.1"
+  }
 }
