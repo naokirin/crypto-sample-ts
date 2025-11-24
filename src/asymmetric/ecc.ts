@@ -14,6 +14,7 @@ import { ed448 } from "@noble/curves/ed448.js";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { p256, p384, p521 } from "@noble/curves/nist.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
+import { bytesToHex, hexToBytes } from "../utils/format.js";
 
 /**
  * サポートする楕円曲線の種類
@@ -96,8 +97,8 @@ export function generateEccKeyPair(curve: CurveType = "secp256k1"): EccKeyPair {
   const publicKey = curveObj.getPublicKey(privateKey);
 
   return {
-    privateKey: Buffer.from(privateKey).toString("hex"),
-    publicKey: Buffer.from(publicKey).toString("hex"),
+    privateKey: bytesToHex(privateKey),
+    publicKey: bytesToHex(publicKey),
     curve,
   };
 }
@@ -118,7 +119,7 @@ export function signEcdsa(
 ): EcdsaSignatureResult {
   try {
     const curveObj = getCurve(curve);
-    const privateKey = Buffer.from(privateKeyHex, "hex");
+    const privateKey = hexToBytes(privateKeyHex);
 
     // Ed25519とEd448はEdDSAを使用
     if (curve === "ed25519" || curve === "ed448") {
@@ -127,7 +128,7 @@ export function signEcdsa(
       const signatureBytes =
         signature instanceof Uint8Array ? signature : new Uint8Array(signature);
       return {
-        signature: Buffer.from(signatureBytes).toString("hex"),
+        signature: bytesToHex(signatureBytes),
       };
     }
 
@@ -135,7 +136,7 @@ export function signEcdsa(
     const signature = curveObj.sign(message, privateKey);
     // ECDSAの署名はUint8ArrayまたはSignatureオブジェクトを返す
     const signatureBytes = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
-    const signatureHex = Buffer.from(signatureBytes).toString("hex");
+    const signatureHex = bytesToHex(signatureBytes);
 
     // secp256k1の場合はリカバリIDも返す
     if (curve === "secp256k1" && typeof signature === "object" && "recovery" in signature) {
@@ -173,8 +174,8 @@ export function verifyEcdsa(
 ): boolean {
   try {
     const curveObj = getCurve(curve);
-    const publicKey = Buffer.from(publicKeyHex, "hex");
-    const signature = Buffer.from(signatureHex, "hex");
+    const publicKey = hexToBytes(publicKeyHex);
+    const signature = hexToBytes(signatureHex);
 
     // Ed25519とEd448はEdDSAを使用
     if (curve === "ed25519" || curve === "ed448") {
@@ -217,8 +218,8 @@ export function computeEcdh(
 ): EcdhResult {
   try {
     const curveObj = getCurve(curve);
-    const privateKey = Buffer.from(privateKeyHex, "hex");
-    const publicKey = Buffer.from(publicKeyHex, "hex");
+    const privateKey = hexToBytes(privateKeyHex);
+    const publicKey = hexToBytes(publicKeyHex);
 
     // 型ガードでECDHをサポートする曲線であることを確認
     if (!isEcdhSupportedCurve(curve)) {
@@ -230,7 +231,7 @@ export function computeEcdh(
     const sharedSecret = ecdhCurve.getSharedSecret(privateKey, publicKey);
 
     return {
-      sharedSecret: Buffer.from(sharedSecret).toString("hex"),
+      sharedSecret: bytesToHex(sharedSecret),
     };
   } catch (error) {
     throw new Error(

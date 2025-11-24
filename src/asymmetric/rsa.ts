@@ -18,6 +18,60 @@ export const RSA_KEY_SIZE_2048 = 2048;
 export const RSA_KEY_SIZE_4096 = 4096;
 
 /**
+ * Uint8Arrayをバイナリ文字列に変換（ブラウザ対応）
+ */
+function uint8ArrayToBinaryString(bytes: Uint8Array): string {
+  let result = "";
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]);
+  }
+  return result;
+}
+
+/**
+ * バイナリ文字列をUint8Arrayに変換（ブラウザ対応）
+ */
+function binaryStringToUint8Array(binary: string): Uint8Array {
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * バイナリ文字列を16進数文字列に変換（ブラウザ対応）
+ */
+function binaryStringToHex(binary: string): string {
+  let hex = "";
+  for (let i = 0; i < binary.length; i++) {
+    const byte = binary.charCodeAt(i);
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+/**
+ * 16進数文字列をバイナリ文字列に変換（ブラウザ対応）
+ */
+function hexToBinaryString(hex: string): string {
+  // 空白や改行を削除
+  const cleanHex = hex.replace(/\s+/g, "");
+  if (cleanHex.length % 2 !== 0) {
+    throw new Error("Invalid hex string: length must be even");
+  }
+  let binary = "";
+  for (let i = 0; i < cleanHex.length; i += 2) {
+    const byte = Number.parseInt(cleanHex.substring(i, i + 2), 16);
+    if (Number.isNaN(byte)) {
+      throw new Error(`Invalid hex string: invalid character at position ${i}`);
+    }
+    binary += String.fromCharCode(byte);
+  }
+  return binary;
+}
+
+/**
  * RSA鍵ペア
  */
 export interface RsaKeyPair {
@@ -76,11 +130,11 @@ export function generateRsaKeyPair(keySize: number = RSA_KEY_SIZE_2048): RsaKeyP
 export function encryptRSA(plaintext: Uint8Array, publicKeyPem: string): RsaEncryptionResult {
   try {
     const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-    const plaintextBuffer = Buffer.from(plaintext);
-    const encrypted = publicKey.encrypt(plaintextBuffer.toString("binary"), "RSA-OAEP");
+    const plaintextBinary = uint8ArrayToBinaryString(plaintext);
+    const encrypted = publicKey.encrypt(plaintextBinary, "RSA-OAEP");
 
     return {
-      ciphertext: Buffer.from(encrypted, "binary").toString("hex"),
+      ciphertext: binaryStringToHex(encrypted),
     };
   } catch (error) {
     throw new Error(
@@ -100,16 +154,11 @@ export function encryptRSA(plaintext: Uint8Array, publicKeyPem: string): RsaEncr
 export function decryptRSA(ciphertextHex: string, privateKeyPem: string): Uint8Array {
   try {
     const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
-    const ciphertext = Buffer.from(ciphertextHex, "hex").toString("binary");
+    const ciphertext = hexToBinaryString(ciphertextHex);
     const decrypted = privateKey.decrypt(ciphertext, "RSA-OAEP");
 
     // バイナリ文字列をUint8Arrayに変換
-    const decryptedBytes = new Uint8Array(decrypted.length);
-    for (let i = 0; i < decrypted.length; i++) {
-      decryptedBytes[i] = decrypted.charCodeAt(i);
-    }
-
-    return decryptedBytes;
+    return binaryStringToUint8Array(decrypted);
   } catch (error) {
     throw new Error(
       `RSA decryption failed: ${error instanceof Error ? error.message : String(error)}`
@@ -133,7 +182,7 @@ export function signRSA(
 ): RsaSignatureResult {
   try {
     const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
-    const messageBuffer = Buffer.from(message);
+    const messageBinary = uint8ArrayToBinaryString(message);
     const algName = algorithm.toLowerCase().replace("-", "");
     let md: forge.md.MessageDigest;
     if (algName === "sha256") {
@@ -147,12 +196,12 @@ export function signRSA(
     } else {
       throw new Error(`Unsupported hash algorithm: ${algorithm}`);
     }
-    md.update(messageBuffer.toString("binary"), "raw");
+    md.update(messageBinary, "raw");
 
     const signature = privateKey.sign(md);
 
     return {
-      signature: Buffer.from(signature, "binary").toString("hex"),
+      signature: binaryStringToHex(signature),
     };
   } catch (error) {
     throw new Error(
@@ -179,7 +228,7 @@ export function verifyRSA(
 ): boolean {
   try {
     const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-    const messageBuffer = Buffer.from(message);
+    const messageBinary = uint8ArrayToBinaryString(message);
     const algName = algorithm.toLowerCase().replace("-", "");
     let md: forge.md.MessageDigest;
     if (algName === "sha256") {
@@ -193,16 +242,20 @@ export function verifyRSA(
     } else {
       throw new Error(`Unsupported hash algorithm: ${algorithm}`);
     }
-    md.update(messageBuffer.toString("binary"), "raw");
+    md.update(messageBinary, "raw");
 
-    const signature = Buffer.from(signatureHex, "hex").toString("binary");
+    const signature = hexToBinaryString(signatureHex);
     const isValid = publicKey.verify(md.digest().bytes(), signature);
 
     return isValid;
   } catch (error) {
     // 無効な署名や間違った鍵ペアの場合はfalseを返す
     // 公開鍵のパースエラーなどの場合はエラーをスロー
-    if (error instanceof Error && error.message.includes("Encryption block is invalid")) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Encryption block is invalid") ||
+        error.message.includes("Encrypted message is invalid"))
+    ) {
       return false;
     }
     throw new Error(

@@ -185,9 +185,10 @@ describe("ECC", () => {
       const keyPair2 = generateEccKeyPair("ed25519");
 
       // 型アサーションを使用してテスト（実際の使用では型エラーになる）
-      expect(() =>
-        computeEcdh(keyPair1.privateKey, keyPair2.publicKey, "ed25519" as any)
-      ).toThrow("ECDH is not supported");
+      // biome-ignore lint/suspicious/noExplicitAny: テストのため、型安全性を無視してanyを使用
+      expect(() => computeEcdh(keyPair1.privateKey, keyPair2.publicKey, "ed25519" as any)).toThrow(
+        "ECDH is not supported"
+      );
     });
   });
 });

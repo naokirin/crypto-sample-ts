@@ -152,6 +152,36 @@
       margin-top: 5px;
     }
 
+    .mode-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #bdc3c7;
+    }
+
+    .mode-tab {
+      padding: 10px 20px;
+      background: #ecf0f1;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #7f8c8d;
+      transition: all 0.3s;
+    }
+
+    .mode-tab:hover {
+      background: #d5dbdb;
+      color: #2c3e50;
+    }
+
+    .mode-tab.active {
+      background: white;
+      color: #3498db;
+      border-bottom-color: #3498db;
+    }
+
     .step {
       margin-bottom: 20px;
       padding: 15px;
@@ -286,6 +316,10 @@
           <option value="aes">AES (Advanced Encryption Standard)</option>
           <option value="chacha20">ChaCha20</option>
           <option value="poly1305">Poly1305 (MAC)</option>
+        </optgroup>
+        <optgroup label="非対称鍵暗号">
+          <option value="rsa">RSA (Rivest-Shamir-Adleman)</option>
+          <option value="ecc">ECC (Elliptic Curve Cryptography)</option>
         </optgroup>
       </select>
     </div>
@@ -978,6 +1012,857 @@
                 4. 認証タグが一致する場合、メッセージは改ざんされていないことが確認されます。
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="selectedCrypto === 'rsa'">
+      <div>
+        <div class="section">
+          <h2>RSA (Rivest-Shamir-Adleman) の動作</h2>
+          <div class="info">
+            <strong>初期化パラメータ:</strong><br />
+            鍵サイズ: <select x-model="rsaState.keySize" style="width: auto; display: inline-block; margin-left: 10px;">
+              <option :value="2048">2048ビット</option>
+              <option :value="4096">4096ビット</option>
+            </select><br />
+            RSA-OAEPパディングを使用
+          </div>
+
+          <!-- モード選択タブ -->
+          <div class="mode-tabs" x-show="rsaState.keyPair">
+            <button class="mode-tab" :class="{ active: rsaState.mode === 'encryption' }"
+              @click="rsaState.mode = 'encryption'">暗号化・復号</button>
+            <button class="mode-tab" :class="{ active: rsaState.mode === 'signature' }"
+              @click="rsaState.mode = 'signature'">署名・検証</button>
+          </div>
+
+          <!-- 鍵生成 -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              鍵ペアの生成
+              <button class="detail-toggle"
+                @click="rsaState.showDetails.keyGeneration = !rsaState.showDetails.keyGeneration"
+                x-show="rsaState.keyPair">
+                <span x-show="!rsaState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="rsaState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="generateRsaKeyPair()">鍵ペアを生成</button>
+            <div x-show="rsaState.keyPair" style="margin-top: 15px;">
+              <div class="data-box">
+                <div class="data-box-label">公開鍵（PEM形式）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="rsaState.keyPair?.publicKey"></div>
+              </div>
+              <div class="data-box" style="margin-top: 10px;">
+                <div class="data-box-label">秘密鍵（PEM形式）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="rsaState.keyPair?.privateKey"></div>
+              </div>
+            </div>
+            <div x-show="rsaState.showDetails.keyGeneration && rsaState.keyPair" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 鍵サイズの選択</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-text="rsaState.keySize"></span>ビットの鍵サイズを選択
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 素数pとqを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号学的に安全な乱数生成器を使用して、大きな素数を生成
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 公開鍵と秘密鍵を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    n = p × q（モジュラス）<br />
+                    公開鍵: (n, e)<br />
+                    秘密鍵: (n, d)
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. PEM形式でエクスポート</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ASN.1形式でエンコードし、Base64でエンコード
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. RSA鍵ペアは、2つの大きな素数pとqから生成されます。これらの素数は暗号学的に安全な乱数生成器を使用して生成されます。<br />
+                2. モジュラスn = p × qを計算し、公開指数e（通常65537）と秘密指数dを計算します。<br />
+                3. 公開鍵は(n, e)のペア、秘密鍵は(n, d)のペアとして表現されます。<br />
+                4. 鍵はPEM形式（Privacy-Enhanced Mail）でエクスポートされ、Base64エンコードされたASN.1構造として保存されます。
+              </div>
+            </div>
+            <div x-show="rsaState.error" style="color: #e74c3c; margin-top: 10px;" x-text="rsaState.error"></div>
+          </div>
+
+          <!-- 暗号化 -->
+          <div class="step" x-show="rsaState.keyPair && rsaState.mode === 'encryption'">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              暗号化
+              <button class="detail-toggle" @click="rsaState.showDetails.encryption = !rsaState.showDetails.encryption"
+                x-show="rsaState.ciphertext">
+                <span x-show="!rsaState.showDetails.encryption">詳細を表示</span>
+                <span x-show="rsaState.showDetails.encryption">詳細を隠す</span>
+              </button>
+            </div>
+            <label>平文:</label>
+            <textarea x-model="rsaState.plaintext" placeholder="暗号化するメッセージを入力"></textarea>
+            <button @click="encryptRSA()" :disabled="!rsaState.keyPair || !rsaState.plaintext">暗号化</button>
+            <div x-show="rsaState.ciphertext" style="margin-top: 15px;">
+              <div class="data-box">
+                <div class="data-box-label">暗号文（16進数）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="rsaState.ciphertext"></div>
+              </div>
+            </div>
+            <div x-show="rsaState.showDetails.encryption && rsaState.ciphertext" class="detail-section">
+              <h4>🔍 暗号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="rsaState.plaintext || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(rsaState.plaintextBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="rsaState.plaintextBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. RSA-OAEPパディング</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    OAEP（Optimal Asymmetric Encryption Padding）を適用してパディング
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 公開鍵で暗号化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    c = m^e mod n<br />
+                    （m: パディングされた平文、e: 公開指数、n: モジュラス）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（暗号文）</div>
+                  <div class="data-box-content"
+                    x-text="rsaState.ciphertext.match(/.{1,64}/g)?.join(' ') || rsaState.ciphertext"></div>
+                  <div class="param-label">長さ: <span x-text="(rsaState.ciphertext?.length || 0) / 2"></span> バイト</div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="rsaState.plaintextBytes">
+                <h4>平文のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(rsaState.plaintextBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0')"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 平文をUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. RSA-OAEPパディングを適用します。OAEPは、RSAの脆弱性を防ぐためのパディング方式で、確率的パディングを使用します。<br />
+                3. 公開鍵(n, e)を使用して、パディングされた平文を暗号化します。暗号文c = m^e mod nとして計算されます。<br />
+                4. 暗号文は16進数文字列として出力されます。RSAの暗号文のサイズは鍵サイズと同じです（2048ビット鍵の場合、256バイト）。
+              </div>
+            </div>
+            <div x-show="rsaState.error" style="color: #e74c3c; margin-top: 10px;" x-text="rsaState.error"></div>
+          </div>
+
+          <!-- 復号化 -->
+          <div class="step" x-show="rsaState.ciphertext && rsaState.mode === 'encryption'">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              復号化
+              <button class="detail-toggle" @click="rsaState.showDetails.decryption = !rsaState.showDetails.decryption"
+                x-show="rsaState.decrypted">
+                <span x-show="!rsaState.showDetails.decryption">詳細を表示</span>
+                <span x-show="rsaState.showDetails.decryption">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="decryptRSA()" :disabled="!rsaState.ciphertext">復号化</button>
+            <div x-show="rsaState.decrypted" class="output" x-text="rsaState.decrypted"></div>
+            <div x-show="rsaState.showDetails.decryption && rsaState.decrypted" class="detail-section">
+              <h4>🔍 復号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（暗号文）</div>
+                  <div class="data-box-content"
+                    x-text="rsaState.ciphertext.match(/.{1,64}/g)?.join(' ') || rsaState.ciphertext"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 16進数をバイト配列に変換</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    16進数文字列をバイト配列に変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 秘密鍵で復号</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    m = c^d mod n<br />
+                    （c: 暗号文、d: 秘密指数、n: モジュラス）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. OAEPパディングを除去</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    OAEPパディングを検証して除去
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. バイト配列を文字列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(rsaState.decryptedBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="rsaState.decryptedBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 出力（文字列）</div>
+                  <div class="data-box-content" x-text="rsaState.decrypted"></div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 16進数文字列の暗号文をバイト配列に変換します。<br />
+                2. 秘密鍵(n, d)を使用して、暗号文を復号します。平文m = c^d mod nとして計算されます。<br />
+                3. OAEPパディングを検証して除去します。パディングが無効な場合、エラーが発生します。<br />
+                4. 復号されたバイト配列をUTF-8デコードして文字列に変換します。
+              </div>
+            </div>
+            <div x-show="rsaState.error" style="color: #e74c3c; margin-top: 10px;" x-text="rsaState.error"></div>
+          </div>
+
+          <!-- 署名 -->
+          <div class="step" x-show="rsaState.keyPair && rsaState.mode === 'signature'">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              デジタル署名
+              <button class="detail-toggle" @click="rsaState.showDetails.signing = !rsaState.showDetails.signing"
+                x-show="rsaState.signature">
+                <span x-show="!rsaState.showDetails.signing">詳細を表示</span>
+                <span x-show="rsaState.showDetails.signing">詳細を隠す</span>
+              </button>
+            </div>
+            <label>署名するメッセージ:</label>
+            <textarea x-model="rsaState.signatureMessage" placeholder="署名するメッセージを入力"></textarea>
+            <button @click="signRSA()" :disabled="!rsaState.keyPair || !rsaState.signatureMessage">署名</button>
+            <div x-show="rsaState.signature" style="margin-top: 15px;">
+              <div class="data-box">
+                <div class="data-box-label">署名（16進数）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="rsaState.signature"></div>
+              </div>
+            </div>
+            <div x-show="rsaState.showDetails.signing && rsaState.signature" class="detail-section">
+              <h4>🔍 署名の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="rsaState.signatureMessage || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(rsaState.signatureMessageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="rsaState.signatureMessageBytes?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. SHA-256でハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    メッセージをSHA-256でハッシュ化（32バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 秘密鍵で署名</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    s = H(m)^d mod n<br />
+                    （H(m): ハッシュ値、d: 秘密指数、n: モジュラス）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（署名）</div>
+                  <div class="data-box-content"
+                    x-text="rsaState.signature.match(/.{1,64}/g)?.join(' ') || rsaState.signature"></div>
+                  <div class="param-label">長さ: <span x-text="(rsaState.signature?.length || 0) / 2"></span> バイト</div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="rsaState.signatureMessageBytes">
+                <h4>メッセージのバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(rsaState.signatureMessageBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0')"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 署名するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. メッセージをSHA-256でハッシュ化します。これにより、任意の長さのメッセージを固定長（32バイト）のハッシュ値に変換します。<br />
+                3. 秘密鍵(n, d)を使用して、ハッシュ値を署名します。署名s = H(m)^d mod nとして計算されます。<br />
+                4. 署名は16進数文字列として出力されます。RSA署名のサイズは鍵サイズと同じです（2048ビット鍵の場合、256バイト）。
+              </div>
+            </div>
+            <div x-show="rsaState.error" style="color: #e74c3c; margin-top: 10px;" x-text="rsaState.error"></div>
+          </div>
+
+          <!-- 署名検証 -->
+          <div class="step" x-show="rsaState.signature && rsaState.mode === 'signature'">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              署名の検証
+              <button class="detail-toggle"
+                @click="rsaState.showDetails.verification = !rsaState.showDetails.verification"
+                x-show="rsaState.verified !== null">
+                <span x-show="!rsaState.showDetails.verification">詳細を表示</span>
+                <span x-show="rsaState.showDetails.verification">詳細を隠す</span>
+              </button>
+            </div>
+            <label>検証するメッセージ:</label>
+            <textarea x-model="rsaState.verificationMessage" placeholder="検証するメッセージを入力"></textarea>
+            <button @click="verifyRSA()" :disabled="!rsaState.signature || !rsaState.verificationMessage">検証</button>
+            <div x-show="rsaState.verified !== null" style="margin-top: 15px;">
+              <div class="data-box"
+                :style="rsaState.verified ? 'border-left-color: #2ecc71;' : 'border-left-color: #e74c3c;'">
+                <div class="data-box-label">検証結果</div>
+                <div class="data-box-content"
+                  :style="rsaState.verified ? 'color: #2ecc71; font-weight: bold;' : 'color: #e74c3c; font-weight: bold;'">
+                  <span x-show="rsaState.verified">✓ 署名は有効です</span>
+                  <span x-show="!rsaState.verified">✗ 署名は無効です</span>
+                </div>
+              </div>
+            </div>
+            <div x-show="rsaState.showDetails.verification && rsaState.verified !== null" class="detail-section">
+              <h4>🔍 検証の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（メッセージ）</div>
+                  <div class="data-box-content" x-text="rsaState.verificationMessage || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(rsaState.verificationMessageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="rsaState.verificationMessageBytes?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. SHA-256でハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    メッセージをSHA-256でハッシュ化（32バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 公開鍵で署名を復号</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    H'(m) = s^e mod n<br />
+                    （s: 署名、e: 公開指数、n: モジュラス）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. ハッシュ値を比較</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    H(m) === H'(m) かどうかを検証
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 検証結果</div>
+                  <div class="data-box-content"
+                    :style="rsaState.verified ? 'color: #2ecc71; font-weight: bold;' : 'color: #e74c3c; font-weight: bold;'">
+                    <span x-show="rsaState.verified">✓ 有効</span>
+                    <span x-show="!rsaState.verified">✗ 無効</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 12px; border-left: 3px solid #ffc107;">
+                <strong>メッセージ比較:</strong><br />
+                <strong>署名時のメッセージ:</strong> <span x-text="rsaState.signatureMessage"></span><br />
+                <strong>検証時のメッセージ:</strong> <span x-text="rsaState.verificationMessage"></span><br />
+                <span x-show="rsaState.signatureMessage === rsaState.verificationMessage"
+                  style="color: #2ecc71; font-weight: bold;">
+                  ✓ メッセージが一致しているため、検証は成功します
+                </span>
+                <span x-show="rsaState.signatureMessage !== rsaState.verificationMessage"
+                  style="color: #e74c3c; font-weight: bold;">
+                  ✗ メッセージが異なるため、検証は失敗します（メッセージが改ざんされたことを検出）
+                </span>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 検証するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. メッセージをSHA-256でハッシュ化します。<br />
+                3. 公開鍵(n, e)を使用して、署名を復号します。復号されたハッシュ値H'(m) = s^e mod nとして計算されます。<br />
+                4. メッセージから計算したハッシュ値H(m)と、署名から復号したハッシュ値H'(m)を比較します。<br />
+                5. ハッシュ値が一致する場合、署名は有効です。一致しない場合、署名は無効です（メッセージが改ざんされた可能性があります）。
+              </div>
+            </div>
+            <div x-show="rsaState.error" style="color: #e74c3c; margin-top: 10px;" x-text="rsaState.error"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="selectedCrypto === 'ecc'">
+      <div>
+        <div class="section">
+          <h2>ECC (Elliptic Curve Cryptography) の動作</h2>
+          <div class="info">
+            <strong>初期化パラメータ:</strong><br />
+            楕円曲線: <select x-model="eccState.curve" style="width: auto; display: inline-block; margin-left: 10px;">
+              <option value="secp256k1">secp256k1 (Bitcoin)</option>
+              <option value="p256">P-256 (NIST)</option>
+              <option value="p384">P-384 (NIST)</option>
+              <option value="p521">P-521 (NIST)</option>
+              <option value="ed25519">Ed25519 (EdDSA)</option>
+              <option value="ed448">Ed448 (EdDSA)</option>
+            </select>
+          </div>
+
+          <!-- モード選択タブ -->
+          <div class="mode-tabs" x-show="eccState.keyPair">
+            <button class="mode-tab" :class="{ active: eccState.mode === 'signature' }"
+              @click="eccState.mode = 'signature'">署名・検証</button>
+            <button class="mode-tab" :class="{ active: eccState.mode === 'ecdh' }" @click="eccState.mode = 'ecdh'"
+              x-show="eccState.curve === 'secp256k1' || eccState.curve === 'p256' || eccState.curve === 'p384' || eccState.curve === 'p521'">ECDH鍵共有</button>
+          </div>
+
+          <!-- 鍵生成 -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              鍵ペアの生成
+              <button class="detail-toggle"
+                @click="eccState.showDetails.keyGeneration = !eccState.showDetails.keyGeneration"
+                x-show="eccState.keyPair">
+                <span x-show="!eccState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="eccState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="generateEccKeyPair()">鍵ペアを生成</button>
+            <div x-show="eccState.keyPair" style="margin-top: 15px;">
+              <div class="data-box">
+                <div class="data-box-label">公開鍵（16進数）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="eccState.keyPair?.publicKey"></div>
+              </div>
+              <div class="data-box" style="margin-top: 10px;">
+                <div class="data-box-label">秘密鍵（16進数）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="eccState.keyPair?.privateKey"></div>
+              </div>
+            </div>
+            <div x-show="eccState.showDetails.keyGeneration && eccState.keyPair" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 曲線の選択</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    楕円曲線: <span x-text="eccState.curve"></span>
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 秘密鍵を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号学的に安全な乱数生成器を使用して、曲線の位数未満のランダムな整数を生成
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 公開鍵を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    Q = d × G<br />
+                    （d: 秘密鍵、G: ベースポイント、Q: 公開鍵）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 鍵を16進数でエクスポート</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    秘密鍵と公開鍵を16進数文字列として出力
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="eccState.keyPair">
+                <h4>秘密鍵のバイト詳細</h4>
+                <div x-show="eccState.keyPair?.privateKey">
+                  <template x-if="eccState.keyPair?.privateKey">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>位置</th>
+                          <th>16進数</th>
+                          <th>10進数</th>
+                          <th>2進数（8ビット）</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template
+                          x-for="(byte, index) in Array.from(cryptoApp.hexToBytes(eccState.keyPair?.privateKey || ''))"
+                          :key="index">
+                          <tr>
+                            <td x-text="index"></td>
+                            <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                            <td x-text="byte"></td>
+                            <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 選択された楕円曲線に基づいて、適切なパラメータ（ベースポイントG、位数など）を設定します。<br />
+                2. 暗号学的に安全な乱数生成器を使用して、曲線の位数未満のランダムな整数を秘密鍵として生成します。<br />
+                3. 楕円曲線上のスカラー倍算を使用して、秘密鍵dから公開鍵Q = d × Gを計算します。これは楕円曲線上の点です。<br />
+                4. 秘密鍵と公開鍵を16進数文字列として出力します。ECCでは、同じセキュリティ強度をRSAよりも短い鍵長で実現できます。
+              </div>
+            </div>
+            <div x-show="eccState.error" style="color: #e74c3c; margin-top: 10px;" x-text="eccState.error"></div>
+          </div>
+
+          <!-- 署名 -->
+          <div class="step" x-show="eccState.keyPair && eccState.mode === 'signature'">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              デジタル署名
+              <button class="detail-toggle" @click="eccState.showDetails.signing = !eccState.showDetails.signing"
+                x-show="eccState.signature">
+                <span x-show="!eccState.showDetails.signing">詳細を表示</span>
+                <span x-show="eccState.showDetails.signing">詳細を隠す</span>
+              </button>
+            </div>
+            <label>署名するメッセージ:</label>
+            <textarea x-model="eccState.signatureMessage" placeholder="署名するメッセージを入力"></textarea>
+            <button @click="signECC()" :disabled="!eccState.keyPair || !eccState.signatureMessage">署名</button>
+            <div x-show="eccState.signature" style="margin-top: 15px;">
+              <div class="data-box">
+                <div class="data-box-label">署名（16進数）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="eccState.signature"></div>
+              </div>
+            </div>
+            <div x-show="eccState.showDetails.signing && eccState.signature" class="detail-section">
+              <h4>🔍 署名の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="eccState.signatureMessage || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(eccState.signatureMessageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="eccState.signatureMessageBytes?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 署名アルゴリズムの選択</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-show="eccState.curve === 'ed25519' || eccState.curve === 'ed448'">EdDSA（Edwards曲線）</span>
+                    <span
+                      x-show="eccState.curve !== 'ed25519' && eccState.curve !== 'ed448'">ECDSA（Weierstrass曲線）</span>
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 楕円曲線で署名</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-show="eccState.curve === 'ed25519' || eccState.curve === 'ed448'">
+                      EdDSA: メッセージと秘密鍵から署名を生成
+                    </span>
+                    <span x-show="eccState.curve !== 'ed25519' && eccState.curve !== 'ed448'">
+                      ECDSA: (r, s) = 署名値<br />
+                      r, sは曲線上の点の座標から計算
+                    </span>
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（署名）</div>
+                  <div class="data-box-content"
+                    x-text="eccState.signature.match(/.{1,64}/g)?.join(' ') || eccState.signature"></div>
+                  <div class="param-label">長さ: <span x-text="(eccState.signature?.length || 0) / 2"></span> バイト</div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="eccState.signatureMessageBytes">
+                <h4>メッセージのバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(eccState.signatureMessageBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0')"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                <span x-show="eccState.curve === 'ed25519' || eccState.curve === 'ed448'">
+                  1. メッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                  2. EdDSA（Edwards-curve Digital Signature
+                  Algorithm）を使用して署名を生成します。EdDSAは、Edwards曲線を使用したデジタル署名アルゴリズムです。<br />
+                  3. EdDSAは、メッセージと秘密鍵から直接署名を計算します。ハッシュ化と署名生成が統合されています。<br />
+                  4. 署名は16進数文字列として出力されます。Ed25519の署名は64バイト、Ed448の署名は114バイトです。
+                </span>
+                <span x-show="eccState.curve !== 'ed25519' && eccState.curve !== 'ed448'">
+                  1. メッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                  2. ECDSA（Elliptic Curve Digital Signature
+                  Algorithm）を使用して署名を生成します。ECDSAは、楕円曲線を使用したデジタル署名アルゴリズムです。<br />
+                  3. メッセージをハッシュ化し、楕円曲線上の演算を使用して署名値(r, s)を計算します。<br />
+                  4. 署名は16進数文字列として出力されます。署名のサイズは曲線によって異なります（secp256k1/P-256: 64バイト、P-384: 96バイト、P-521: 132バイト）。
+                </span>
+              </div>
+            </div>
+            <div x-show="eccState.error" style="color: #e74c3c; margin-top: 10px;" x-text="eccState.error"></div>
+          </div>
+
+          <!-- 署名検証 -->
+          <div class="step" x-show="eccState.signature && eccState.mode === 'signature'">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              署名の検証
+              <button class="detail-toggle"
+                @click="eccState.showDetails.verification = !eccState.showDetails.verification"
+                x-show="eccState.verified !== null">
+                <span x-show="!eccState.showDetails.verification">詳細を表示</span>
+                <span x-show="eccState.showDetails.verification">詳細を隠す</span>
+              </button>
+            </div>
+            <label>検証するメッセージ:</label>
+            <textarea x-model="eccState.verificationMessage" placeholder="検証するメッセージを入力"></textarea>
+            <button @click="verifyECC()" :disabled="!eccState.signature || !eccState.verificationMessage">検証</button>
+            <div x-show="eccState.verified !== null" style="margin-top: 15px;">
+              <div class="data-box"
+                :style="eccState.verified ? 'border-left-color: #2ecc71;' : 'border-left-color: #e74c3c;'">
+                <div class="data-box-label">検証結果</div>
+                <div class="data-box-content"
+                  :style="eccState.verified ? 'color: #2ecc71; font-weight: bold;' : 'color: #e74c3c; font-weight: bold;'">
+                  <span x-show="eccState.verified">✓ 署名は有効です</span>
+                  <span x-show="!eccState.verified">✗ 署名は無効です</span>
+                </div>
+              </div>
+            </div>
+            <div x-show="eccState.showDetails.verification && eccState.verified !== null" class="detail-section">
+              <h4>🔍 検証の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（メッセージ）</div>
+                  <div class="data-box-content" x-text="eccState.verificationMessage || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(eccState.verificationMessageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="eccState.verificationMessageBytes?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 署名アルゴリズムの選択</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-show="eccState.curve === 'ed25519' || eccState.curve === 'ed448'">EdDSA（Edwards曲線）</span>
+                    <span
+                      x-show="eccState.curve !== 'ed25519' && eccState.curve !== 'ed448'">ECDSA（Weierstrass曲線）</span>
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 楕円曲線で検証</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-show="eccState.curve === 'ed25519' || eccState.curve === 'ed448'">
+                      EdDSA: メッセージ、署名、公開鍵から検証
+                    </span>
+                    <span x-show="eccState.curve !== 'ed25519' && eccState.curve !== 'ed448'">
+                      ECDSA: 楕円曲線上の演算で署名を検証
+                    </span>
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 検証結果</div>
+                  <div class="data-box-content"
+                    :style="eccState.verified ? 'color: #2ecc71; font-weight: bold;' : 'color: #e74c3c; font-weight: bold;'">
+                    <span x-show="eccState.verified">✓ 有効</span>
+                    <span x-show="!eccState.verified">✗ 無効</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 12px; border-left: 3px solid #ffc107;">
+                <strong>メッセージ比較:</strong><br />
+                <strong>署名時のメッセージ:</strong> <span x-text="eccState.signatureMessage"></span><br />
+                <strong>検証時のメッセージ:</strong> <span x-text="eccState.verificationMessage"></span><br />
+                <span x-show="eccState.signatureMessage === eccState.verificationMessage"
+                  style="color: #2ecc71; font-weight: bold;">
+                  ✓ メッセージが一致しているため、検証は成功します
+                </span>
+                <span x-show="eccState.signatureMessage !== eccState.verificationMessage"
+                  style="color: #e74c3c; font-weight: bold;">
+                  ✗ メッセージが異なるため、検証は失敗します（メッセージが改ざんされたことを検出）
+                </span>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                <span x-show="eccState.curve === 'ed25519' || eccState.curve === 'ed448'">
+                  1. 検証するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                  2. EdDSAを使用して、メッセージ、署名、公開鍵から署名の有効性を検証します。<br />
+                  3. 楕円曲線上の演算を使用して、署名が正しいことを確認します。<br />
+                  4. 検証が成功した場合、署名は有効です。失敗した場合、署名は無効です（メッセージが改ざんされた可能性があります）。
+                </span>
+                <span x-show="eccState.curve !== 'ed25519' && eccState.curve !== 'ed448'">
+                  1. 検証するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                  2. メッセージをハッシュ化します。<br />
+                  3. ECDSAを使用して、ハッシュ値、署名、公開鍵から署名の有効性を検証します。<br />
+                  4. 楕円曲線上の演算を使用して、署名値(r, s)が正しいことを確認します。<br />
+                  5. 検証が成功した場合、署名は有効です。失敗した場合、署名は無効です（メッセージが改ざんされた可能性があります）。
+                </span>
+              </div>
+            </div>
+            <div x-show="eccState.error" style="color: #e74c3c; margin-top: 10px;" x-text="eccState.error"></div>
+          </div>
+
+          <!-- ECDH -->
+          <div class="step"
+            x-show="eccState.keyPair && eccState.mode === 'ecdh' && (eccState.curve === 'secp256k1' || eccState.curve === 'p256' || eccState.curve === 'p384' || eccState.curve === 'p521')">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              ECDH鍵共有
+              <button class="detail-toggle" @click="eccState.showDetails.ecdh = !eccState.showDetails.ecdh"
+                x-show="eccState.sharedSecret">
+                <span x-show="!eccState.showDetails.ecdh">詳細を表示</span>
+                <span x-show="eccState.showDetails.ecdh">詳細を隠す</span>
+              </button>
+            </div>
+            <label>自分の秘密鍵（16進数）:</label>
+            <input type="text" x-model="eccState.ecdhPrivateKey" placeholder="秘密鍵を入力">
+            <label style="margin-top: 10px;">相手の公開鍵（16進数）:</label>
+            <input type="text" x-model="eccState.ecdhPublicKey" placeholder="公開鍵を入力">
+            <button @click="computeECDH()"
+              :disabled="!eccState.ecdhPrivateKey || !eccState.ecdhPublicKey">共有秘密鍵を計算</button>
+            <div x-show="eccState.sharedSecret" style="margin-top: 15px;">
+              <div class="data-box">
+                <div class="data-box-label">共有秘密鍵（16進数）</div>
+                <div class="data-box-content" style="word-break: break-all; font-size: 11px;"
+                  x-text="eccState.sharedSecret"></div>
+              </div>
+            </div>
+            <div x-show="eccState.showDetails.ecdh && eccState.sharedSecret" class="detail-section">
+              <h4>🔍 ECDH鍵共有の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 自分の秘密鍵</div>
+                  <div class="data-box-content" style="font-size: 10px; word-break: break-all;"
+                    x-text="eccState.ecdhPrivateKey"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 相手の公開鍵</div>
+                  <div class="data-box-content" style="font-size: 10px; word-break: break-all;"
+                    x-text="eccState.ecdhPublicKey"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 楕円曲線上のスカラー倍算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    S = d_A × Q_B<br />
+                    （d_A: 自分の秘密鍵、Q_B: 相手の公開鍵、S: 共有秘密鍵）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 出力（共有秘密鍵）</div>
+                  <div class="data-box-content"
+                    x-text="eccState.sharedSecret.match(/.{1,64}/g)?.join(' ') || eccState.sharedSecret"></div>
+                  <div class="param-label">長さ: <span x-text="(eccState.sharedSecret?.length || 0) / 2"></span> バイト</div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 自分の秘密鍵d_Aと相手の公開鍵Q_Bを使用して、共有秘密鍵を計算します。<br />
+                2. 楕円曲線上のスカラー倍算を使用して、S = d_A × Q_Bを計算します。これは楕円曲線上の点です。<br />
+                3. この点のx座標（または座標のハッシュ値）が共有秘密鍵として使用されます。<br />
+                4. 相手も同様に、自分の秘密鍵d_Bと自分の公開鍵Q_Aから同じ共有秘密鍵S = d_B × Q_A = d_A × d_B × Gを計算できます。<br />
+                5. 共有秘密鍵は、対称鍵暗号の鍵として使用できます。
+              </div>
+            </div>
+            <div x-show="eccState.error" style="color: #e74c3c; margin-top: 10px;" x-text="eccState.error"></div>
           </div>
         </div>
       </div>

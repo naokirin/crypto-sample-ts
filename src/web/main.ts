@@ -1,4 +1,23 @@
 import {
+  type CurveType,
+  type EccKeyPair,
+  computeEcdh,
+  generateEccKeyPair,
+  signEcdsa,
+  signEddsa,
+  verifyEcdsa,
+  verifyEddsa,
+} from "../asymmetric/ecc.js";
+import {
+  RSA_KEY_SIZE_2048,
+  type RsaKeyPair,
+  decryptRSA,
+  encryptRSA,
+  generateRsaKeyPair,
+  signRSA,
+  verifyRSA,
+} from "../asymmetric/rsa.js";
+import {
   type AesEncryptionResult,
   decryptAES,
   encryptAES,
@@ -77,6 +96,55 @@ function cryptoApp() {
       },
     },
 
+    // RSA状態
+    rsaState: {
+      keyPair: null as RsaKeyPair | null,
+      keySize: RSA_KEY_SIZE_2048,
+      mode: "encryption" as "encryption" | "signature",
+      plaintext: "",
+      plaintextBytes: null as Uint8Array | null,
+      ciphertext: "",
+      decrypted: "",
+      decryptedBytes: null as Uint8Array | null,
+      signatureMessage: "",
+      signatureMessageBytes: null as Uint8Array | null,
+      signature: "",
+      verificationMessage: "",
+      verificationMessageBytes: null as Uint8Array | null,
+      verified: null as boolean | null,
+      error: "",
+      showDetails: {
+        keyGeneration: true,
+        encryption: true,
+        decryption: true,
+        signing: true,
+        verification: true,
+      },
+    },
+
+    // ECC状態
+    eccState: {
+      keyPair: null as EccKeyPair | null,
+      curve: "secp256k1" as CurveType,
+      mode: "signature" as "signature" | "ecdh",
+      signatureMessage: "",
+      signatureMessageBytes: null as Uint8Array | null,
+      signature: "",
+      verificationMessage: "",
+      verificationMessageBytes: null as Uint8Array | null,
+      verified: null as boolean | null,
+      ecdhPrivateKey: "",
+      ecdhPublicKey: "",
+      sharedSecret: "",
+      error: "",
+      showDetails: {
+        keyGeneration: true,
+        signing: true,
+        verification: true,
+        ecdh: true,
+      },
+    },
+
     /**
      * 状態をリセット
      */
@@ -126,6 +194,51 @@ function cryptoApp() {
           keyGeneration: true,
           mac: true,
           verification: true,
+        },
+      };
+      this.rsaState = {
+        keyPair: null,
+        keySize: RSA_KEY_SIZE_2048,
+        mode: "encryption",
+        plaintext: "",
+        plaintextBytes: null,
+        ciphertext: "",
+        decrypted: "",
+        decryptedBytes: null,
+        signatureMessage: "",
+        signatureMessageBytes: null,
+        signature: "",
+        verificationMessage: "",
+        verificationMessageBytes: null,
+        verified: null,
+        error: "",
+        showDetails: {
+          keyGeneration: true,
+          encryption: true,
+          decryption: true,
+          signing: true,
+          verification: true,
+        },
+      };
+      this.eccState = {
+        keyPair: null,
+        curve: "secp256k1",
+        mode: "signature",
+        signatureMessage: "",
+        signatureMessageBytes: null,
+        signature: "",
+        verificationMessage: "",
+        verificationMessageBytes: null,
+        verified: null,
+        ecdhPrivateKey: "",
+        ecdhPublicKey: "",
+        sharedSecret: "",
+        error: "",
+        showDetails: {
+          keyGeneration: true,
+          signing: true,
+          verification: true,
+          ecdh: true,
         },
       };
     },
@@ -202,6 +315,17 @@ function cryptoApp() {
      */
     bytesToString(bytes: Uint8Array): string {
       return new TextDecoder().decode(bytes);
+    },
+
+    /**
+     * 16進数文字列をバイト配列に変換
+     */
+    hexToBytes(hex: string): Uint8Array {
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = Number.parseInt(hex.substr(i, 2), 16);
+      }
+      return bytes;
     },
 
     // ========== AES メソッド ==========
@@ -395,6 +519,210 @@ function cryptoApp() {
       } catch (error) {
         this.poly1305State.error = `MAC検証エラー: ${error instanceof Error ? error.message : String(error)}`;
         this.poly1305State.verified = false;
+      }
+    },
+
+    // ========== RSA メソッド ==========
+
+    /**
+     * RSA鍵ペアを生成
+     */
+    generateRsaKeyPair() {
+      try {
+        // keySizeを数値に変換（HTMLのselectから文字列で取得される可能性があるため）
+        const keySize = Number(this.rsaState.keySize);
+        this.rsaState.keyPair = generateRsaKeyPair(keySize);
+        this.rsaState.error = "";
+      } catch (error) {
+        this.rsaState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * RSAで暗号化
+     */
+    encryptRSA() {
+      if (!this.rsaState.keyPair || !this.rsaState.plaintext) {
+        return;
+      }
+
+      try {
+        const plaintextBytes = this.stringToBytes(this.rsaState.plaintext);
+        this.rsaState.plaintextBytes = plaintextBytes;
+        const result = encryptRSA(plaintextBytes, this.rsaState.keyPair.publicKey);
+        this.rsaState.ciphertext = result.ciphertext;
+        this.rsaState.error = "";
+      } catch (error) {
+        this.rsaState.error = `暗号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * RSAで復号化
+     */
+    decryptRSA() {
+      if (!this.rsaState.keyPair || !this.rsaState.ciphertext) {
+        return;
+      }
+
+      try {
+        const decryptedBytes = decryptRSA(
+          this.rsaState.ciphertext,
+          this.rsaState.keyPair.privateKey
+        );
+        this.rsaState.decryptedBytes = decryptedBytes;
+        this.rsaState.decrypted = this.bytesToString(decryptedBytes);
+        this.rsaState.error = "";
+      } catch (error) {
+        this.rsaState.error = `復号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.rsaState.decrypted = "";
+        this.rsaState.decryptedBytes = null;
+      }
+    },
+
+    /**
+     * RSAで署名
+     */
+    signRSA() {
+      if (!this.rsaState.keyPair || !this.rsaState.signatureMessage) {
+        return;
+      }
+
+      try {
+        const messageBytes = this.stringToBytes(this.rsaState.signatureMessage);
+        this.rsaState.signatureMessageBytes = messageBytes;
+        const result = signRSA(messageBytes, this.rsaState.keyPair.privateKey);
+        this.rsaState.signature = result.signature;
+        this.rsaState.error = "";
+      } catch (error) {
+        this.rsaState.error = `署名エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * RSAで署名を検証
+     */
+    verifyRSA() {
+      if (
+        !this.rsaState.keyPair ||
+        !this.rsaState.signature ||
+        !this.rsaState.verificationMessage
+      ) {
+        return;
+      }
+
+      try {
+        const messageBytes = this.stringToBytes(this.rsaState.verificationMessage);
+        this.rsaState.verificationMessageBytes = messageBytes;
+        this.rsaState.verified = verifyRSA(
+          messageBytes,
+          this.rsaState.signature,
+          this.rsaState.keyPair.publicKey
+        );
+        this.rsaState.error = "";
+      } catch (error) {
+        this.rsaState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.rsaState.verified = false;
+      }
+    },
+
+    // ========== ECC メソッド ==========
+
+    /**
+     * ECC鍵ペアを生成
+     */
+    generateEccKeyPair() {
+      try {
+        this.eccState.keyPair = generateEccKeyPair(this.eccState.curve);
+        this.eccState.error = "";
+      } catch (error) {
+        this.eccState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * ECCで署名（ECDSA/EdDSA）
+     */
+    signECC() {
+      if (!this.eccState.keyPair || !this.eccState.signatureMessage) {
+        return;
+      }
+
+      try {
+        const messageBytes = this.stringToBytes(this.eccState.signatureMessage);
+        this.eccState.signatureMessageBytes = messageBytes;
+        const curve = this.eccState.keyPair.curve;
+        const result =
+          curve === "ed25519" || curve === "ed448"
+            ? signEddsa(messageBytes, this.eccState.keyPair.privateKey, curve)
+            : signEcdsa(messageBytes, this.eccState.keyPair.privateKey, curve);
+        this.eccState.signature = result.signature;
+        this.eccState.error = "";
+      } catch (error) {
+        this.eccState.error = `署名エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * ECCで署名を検証（ECDSA/EdDSA）
+     */
+    verifyECC() {
+      if (
+        !this.eccState.keyPair ||
+        !this.eccState.signature ||
+        !this.eccState.verificationMessage
+      ) {
+        return;
+      }
+
+      try {
+        const messageBytes = this.stringToBytes(this.eccState.verificationMessage);
+        this.eccState.verificationMessageBytes = messageBytes;
+        const curve = this.eccState.keyPair.curve;
+        this.eccState.verified =
+          curve === "ed25519" || curve === "ed448"
+            ? verifyEddsa(
+              messageBytes,
+              this.eccState.signature,
+              this.eccState.keyPair.publicKey,
+              curve
+            )
+            : verifyEcdsa(
+              messageBytes,
+              this.eccState.signature,
+              this.eccState.keyPair.publicKey,
+              curve
+            );
+        this.eccState.error = "";
+      } catch (error) {
+        this.eccState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.eccState.verified = false;
+      }
+    },
+
+    /**
+     * ECDHで共有秘密鍵を計算
+     */
+    computeECDH() {
+      if (!this.eccState.ecdhPrivateKey || !this.eccState.ecdhPublicKey) {
+        return;
+      }
+
+      try {
+        const curve = this.eccState.curve;
+        if (curve === "ed25519" || curve === "ed448") {
+          this.eccState.error = `ECDHは${curve}ではサポートされていません`;
+          return;
+        }
+        const result = computeEcdh(
+          this.eccState.ecdhPrivateKey,
+          this.eccState.ecdhPublicKey,
+          curve
+        );
+        this.eccState.sharedSecret = result.sharedSecret;
+        this.eccState.error = "";
+      } catch (error) {
+        this.eccState.error = `ECDH計算エラー: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
   };
