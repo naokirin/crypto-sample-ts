@@ -321,6 +321,7 @@
           <option value="rsa">RSA (Rivest-Shamir-Adleman)</option>
           <option value="ecc">ECC (Elliptic Curve Cryptography)</option>
           <option value="ibe">IBE (Identity-Based Encryption)</option>
+          <option value="abe">ABE (Attribute-Based Encryption)</option>
         </optgroup>
       </select>
     </div>
@@ -2296,6 +2297,391 @@
           </div>
 
           <div x-show="ibeState.error" style="color: #e74c3c; margin-top: 10px;" x-text="ibeState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="selectedCrypto === 'abe'">
+      <div>
+        <div class="section">
+          <h2>ABE (Attribute-Based Encryption) の動作</h2>
+          <div class="info">
+            <strong>CP-ABE (Ciphertext-Policy Attribute-Based Encryption) スキーム</strong><br />
+            属性ベース暗号は、暗号文にアクセスポリシーを設定し、属性セットを持つ秘密鍵で復号化できる暗号方式です。<br />
+            <span style="font-size: 0.9em; color: #e8f4f8; font-style: italic;">
+              ※ 本実装は簡易版のため、属性の完全一致のみを許容しています。実際のCP-ABEでは、AND/ORなどの論理演算を含む複雑なポリシー構造をサポートできます。
+            </span>
+          </div>
+
+          <!-- 初期化 -->
+          <div class="subsection">
+            <h3>1. 初期化</h3>
+            <button @click="initializeABE()" :disabled="abeState.initialized">WebAssemblyモジュールを初期化</button>
+            <div x-show="abeState.initialized" class="output">✅ 初期化完了</div>
+            <div x-show="abeState.showDetails.initialization && abeState.initialized" class="detail-section">
+              <div class="data-box">
+                <div class="data-box-header">初期化完了</div>
+                <div class="data-box-content">
+                  CP-ABEスキームが使用可能になりました。Setup、KeyGen、Encrypt、Decryptの各操作を実行できます。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- マスター鍵生成 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="abeState.showDetails.keyGeneration = !abeState.showDetails.keyGeneration"
+                x-show="abeState.masterKey">
+                <span x-show="!abeState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="abeState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+              2. マスター鍵ペアの生成
+            </h3>
+            <button @click="generateABEKeyPair()" :disabled="!abeState.initialized">マスター鍵ペアを生成</button>
+            <div x-show="abeState.masterKey" class="output">
+              <div>マスター鍵: <span x-text="formatBytes(abeState.masterKey?.secret || null)"></span></div>
+              <div>公開パラメータ: <span x-text="formatBytes(abeState.publicParams?.params || null)"></span></div>
+            </div>
+            <div x-show="abeState.showDetails.keyGeneration && abeState.masterKey" class="detail-section">
+              <h4>🔍 マスター鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. ランダムなマスター秘密鍵αを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    getrandomを使用して暗号学的に安全な乱数を生成<br />
+                    曲線の位数で剰余を取る
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 生成元Pを取得</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ECP::generator() で楕円曲線の生成元を取得
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 公開パラメータP_pubを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    P_pub = αP<br />
+                    （楕円曲線上のスカラー倍算）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. マスター鍵α（32バイト）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(abeState.masterKey?.secret || null)"></div>
+                  <div class="param-label">長さ: <span x-text="abeState.masterKey?.secret?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 公開パラメータP_pub</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(abeState.publicParams?.params || null)">
+                  </div>
+                  <div class="param-label">長さ: <span x-text="abeState.publicParams?.params?.length || 0"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Setupアルゴリズム: マスター秘密鍵αをランダムに選択します。この鍵は秘密情報として厳重に管理する必要があります。<br />
+                2. 公開パラメータP_pub = αPを計算します。Pは楕円曲線（BN254）の生成元です。<br />
+                3. マスター鍵αは32バイト（256ビット）のBIG型として保存されます。<br />
+                4. 公開パラメータP_pubは楕円曲線上の点（ECP）として、65バイトでエンコードされます。<br />
+                5. この公開パラメータは、すべてのユーザーに公開され、暗号化に使用されます。
+              </div>
+            </div>
+          </div>
+
+          <!-- 秘密鍵生成 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="abeState.showDetails.keyExtraction = !abeState.showDetails.keyExtraction"
+                x-show="abeState.privateKey">
+                <span x-show="!abeState.showDetails.keyExtraction">詳細を表示</span>
+                <span x-show="abeState.showDetails.keyExtraction">詳細を隠す</span>
+              </button>
+              3. 属性セットから秘密鍵を生成
+            </h3>
+            <label>属性を追加（1つずつ、またはカンマ区切りで複数、例: A または A, B, C）:</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+              <input type="text" x-model="abeState.attributeInput" placeholder="属性名を入力（例: A または A, B, C）"
+                style="flex: 1;" />
+              <button @click="addAttribute()">属性を追加</button>
+            </div>
+            <div x-show="abeState.attributes.length > 0" style="margin-bottom: 10px;">
+              <strong>属性セット:</strong>
+              <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                <template x-for="(attr, index) in abeState.attributes" :key="index">
+                  <span
+                    style="background: #3498db; color: white; padding: 5px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;">
+                    <span x-text="attr"></span>
+                    <button @click="removeAttribute(index)"
+                      style="background: rgba(255,255,255,0.3); border: none; color: white; cursor: pointer; padding: 2px 5px; border-radius: 2px;">×</button>
+                  </span>
+                </template>
+              </div>
+            </div>
+            <button @click="extractABEKey()"
+              :disabled="!abeState.masterKey || abeState.attributes.length === 0">秘密鍵を生成</button>
+            <div x-show="abeState.privateKey" class="output">
+              秘密鍵: <span x-text="formatBytes(abeState.privateKey?.key || null)"></span><br />
+              属性: <span x-text="abeState.privateKey?.attributes?.join(', ') || ''"></span>
+            </div>
+            <div x-show="abeState.showDetails.keyExtraction && abeState.privateKey" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 属性セット</div>
+                  <div class="data-box-content" x-text="abeState.attributes.join(', ') || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 各属性をハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各属性attrに対して:<br />
+                    H(attr) = SHA-256(attr)<br />
+                    ECP2上の点に変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 秘密鍵コンポーネントを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各属性に対して:<br />
+                    key_comp = α × H(attr)<br />
+                    （マスター鍵αでスカラー倍算）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 生成された秘密鍵</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(abeState.privateKey?.key || null)"></div>
+                  <div class="param-label">長さ: <span x-text="abeState.privateKey?.key?.length || 0"></span> バイト</div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. KeyGenアルゴリズム: 属性セットを受け取ります。<br />
+                2. 各属性をSHA-256でハッシュ化し、ECP2上の点H(attr)にマッピングします。<br />
+                3. マスター秘密鍵αを使用して、各属性に対応する秘密鍵コンポーネントkey_comp = αH(attr)を計算します。<br />
+                4. すべての鍵コンポーネントを結合して、属性セットに対応する秘密鍵を生成します。<br />
+                5. この秘密鍵は、ポリシーを満たす属性セットを持つ場合にのみ、暗号文を復号化できます。
+              </div>
+            </div>
+          </div>
+
+          <!-- 暗号化 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle" @click="abeState.showDetails.encryption = !abeState.showDetails.encryption"
+                x-show="abeState.ciphertext">
+                <span x-show="!abeState.showDetails.encryption">詳細を表示</span>
+                <span x-show="abeState.showDetails.encryption">詳細を隠す</span>
+              </button>
+              4. メッセージの暗号化
+            </h3>
+            <label>アクセスポリシー（カンマ区切りの属性、例: A,B,C）:</label>
+            <div style="font-size: 0.85em; color: #555; margin-bottom: 5px; font-style: italic;">
+              ※ 簡易実装のため、属性の完全一致のみをサポートしています。すべての属性が一致する必要があります。
+            </div>
+            <input type="text" x-model="abeState.policy" placeholder="A,B,C" />
+            <label>平文:</label>
+            <textarea x-model="abeState.plaintext" placeholder="暗号化するメッセージを入力"></textarea>
+            <button @click="encryptABE()"
+              :disabled="!abeState.publicParams || !abeState.policy || !abeState.plaintext">暗号化</button>
+            <div x-show="abeState.ciphertext" class="output">
+              暗号文: <span x-text="formatBytes(abeState.ciphertext)"></span>
+            </div>
+            <div x-show="abeState.showDetails.encryption && abeState.ciphertext" class="detail-section">
+              <h4>🔍 暗号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. ポリシー（属性リスト）</div>
+                  <div class="data-box-content" x-text="abeState.policy || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. ランダムなsを選択</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    getrandomを使用して暗号学的に安全な乱数を生成
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. C0 = sPを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    C0は暗号文の一部<br />
+                    Pは生成元
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 各属性の暗号文コンポーネント</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各属性attrに対して:<br />
+                    C_attr = s × H(attr)
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. メッセージの暗号化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ペアリング演算の結果をハッシュ化<br />
+                    V = M ⊕ H(e(P_pub, H(attr))^s)
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 暗号文（C0 || V || C_attrs）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(abeState.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="abeState.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Encryptアルゴリズム: アクセスポリシー（属性のリスト）とメッセージを受け取ります。<br />
+                2. ランダムなsを選択し、C0 = sPを計算します。<br />
+                3. 各属性に対して、暗号文コンポーネントC_attr = sH(attr)を計算します。<br />
+                4. ペアリング演算e(P_pub, H(attr))^sを計算し、その結果をハッシュ化して鍵を生成します。<br />
+                5. この鍵とメッセージをXOR演算して、暗号文Vを生成します。<br />
+                6. 最終的な暗号文は、C0、V、およびすべての属性コンポーネントC_attrsを結合したものです。
+              </div>
+            </div>
+          </div>
+
+          <!-- 復号化 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle" @click="abeState.showDetails.decryption = !abeState.showDetails.decryption"
+                x-show="abeState.decryptionSucceeded !== null">
+                <span x-show="!abeState.showDetails.decryption">詳細を表示</span>
+                <span x-show="abeState.showDetails.decryption">詳細を隠す</span>
+              </button>
+              5. 暗号文の復号化
+            </h3>
+            <button @click="decryptABE()" :disabled="!abeState.privateKey || !abeState.ciphertext">復号化</button>
+            <div x-show="abeState.decryptionSucceeded !== null" style="margin-top: 15px;">
+              <div class="data-box"
+                :style="abeState.decryptionSucceeded ? 'border-left-color: #2ecc71;' : 'border-left-color: #e74c3c;'">
+                <div class="data-box-label">復号化結果</div>
+                <div class="data-box-content">
+                  <span x-show="abeState.decryptionSucceeded" style="color: #2ecc71; font-weight: bold">
+                    ✓ 復号化成功
+                  </span>
+                  <span x-show="!abeState.decryptionSucceeded" style="color: #e74c3c; font-weight: bold">
+                    ✗ 復号化失敗（属性が一致しません）
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div x-show="abeState.decrypted && abeState.decryptionSucceeded" class="output">
+              復号化されたメッセージ: <span x-text="abeState.decrypted"></span>
+            </div>
+            <div x-show="abeState.showDetails.decryption && abeState.decryptionSucceeded && abeState.decrypted"
+              class="detail-section">
+              <h4>🔍 復号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号文を解析</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    C0、V、C_attrsを抽出<br />
+                    （C0 || V || C_attrsの形式）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 秘密鍵コンポーネントを抽出</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    属性に対応する鍵コンポーネントを取得
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ペアリング演算を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    e(key_comp, C0)を計算<br />
+                    暗号化時の鍵と一致する
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 鍵を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ペアリング演算の結果をハッシュ化<br />
+                    H(e(key_comp, C0))
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. メッセージを復元</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    M = V ⊕ H(e(key_comp, C0))<br />
+                    XOR演算で元のメッセージを取得
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 復号化されたメッセージ</div>
+                  <div class="data-box-content" x-text="abeState.decrypted || '(空)'"></div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Decryptアルゴリズム: 秘密鍵と暗号文を受け取ります。<br />
+                2. 暗号文から属性数を読み取り、秘密鍵の属性数と比較します。<br />
+                3. 属性数が一致しない場合、復号化は失敗します（属性が異なるため）。<br />
+                4. 属性数が一致する場合、暗号文からC0、V、C_attrsを抽出します。<br />
+                5. 秘密鍵から属性に対応する鍵コンポーネントを取得します。<br />
+                6. ペアリング演算e(key_comp, C0)を計算します。数学的には、e(αH(attr), sP) = e(H(attr), P)^(αs)となります。<br />
+                7. 暗号化時にはe(P_pub, H(attr))^s = e(αP, H(attr))^s = e(H(attr), P)^(αs)を計算したので、これらは等しくなります。<br />
+                8. ペアリング演算の結果をハッシュ化して、32バイトの鍵を生成します（暗号化時と同じ鍵）。<br />
+                9. この鍵とVをXOR演算して、元のメッセージMを復元します。<br />
+                10. バイト配列をUTF-8文字列に変換して、最終的なメッセージを取得します。
+              </div>
+            </div>
+            <div
+              x-show="abeState.showDetails.decryption && !abeState.decryptionSucceeded && abeState.decryptionSucceeded !== null"
+              class="detail-section">
+              <h4>🔍 復号化失敗の理由</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号文の属性数を確認</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号文の先頭から属性数を読み取る
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 秘密鍵の属性数を確認</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    秘密鍵に含まれる属性数を確認
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box" style="border-left-color: #e74c3c;">
+                  <div class="data-box-label">3. 属性数の不一致を検出</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号化時に使用した属性と<br />
+                    鍵生成時に使用した属性が異なるため、<br />
+                    復号化できません
+                  </div>
+                </div>
+              </div>
+              <div
+                style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px; font-size: 12px; color: #721c24;">
+                <strong>復号化失敗の理由:</strong><br />
+                CP-ABEでは、暗号化時に使用した属性と鍵生成時に使用した属性が一致する必要があります。<br />
+                属性が異なる場合、暗号文の構造と秘密鍵の構造が一致しないため、復号化できません。<br />
+                これは、属性ベース暗号のセキュリティ特性の一部です。
+              </div>
+            </div>
+          </div>
+
+          <div x-show="abeState.error" style="color: #e74c3c; margin-top: 10px;" x-text="abeState.error"></div>
         </div>
       </div>
     </template>

@@ -44,6 +44,16 @@ import {
   generateIBEKeyPair,
   initIBE,
 } from "../asymmetric/ibe.js";
+import {
+  type ABEMasterKey,
+  type ABEPublicParams,
+  type ABEPrivateKey,
+  decryptABE,
+  encryptABE,
+  extractABEKey,
+  generateABEKeyPair,
+  initABE,
+} from "../asymmetric/abe.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -177,6 +187,31 @@ function cryptoApp() {
       },
     },
 
+    // ABE状態
+    abeState: {
+      initialized: false,
+      masterKey: null as ABEMasterKey | null,
+      publicParams: null as ABEPublicParams | null,
+      attributes: [] as string[],
+      attributeInput: "",
+      privateKey: null as ABEPrivateKey | null,
+      policy: "",
+      plaintext: "",
+      plaintextBytes: null as Uint8Array | null,
+      ciphertext: null as Uint8Array | null,
+      decrypted: "",
+      decryptedBytes: null as Uint8Array | null,
+      decryptionSucceeded: null as boolean | null,
+      error: "",
+      showDetails: {
+        initialization: true,
+        keyGeneration: true,
+        keyExtraction: true,
+        encryption: true,
+        decryption: true,
+      },
+    },
+
     /**
      * 状態をリセット
      */
@@ -271,6 +306,49 @@ function cryptoApp() {
           signing: true,
           verification: true,
           ecdh: true,
+        },
+      };
+      this.ibeState = {
+        initialized: false,
+        masterKey: null,
+        publicParams: null,
+        identity: "",
+        privateKey: null,
+        plaintext: "",
+        plaintextBytes: null,
+        ciphertext: null,
+        decrypted: "",
+        decryptedBytes: null,
+        error: "",
+        showDetails: {
+          initialization: true,
+          keyGeneration: true,
+          keyExtraction: true,
+          encryption: true,
+          decryption: true,
+        },
+      };
+      this.abeState = {
+        initialized: false,
+        masterKey: null,
+        publicParams: null,
+        attributes: [],
+        attributeInput: "",
+        privateKey: null,
+        policy: "",
+        plaintext: "",
+        plaintextBytes: null,
+        ciphertext: null,
+        decrypted: "",
+        decryptedBytes: null,
+        decryptionSucceeded: null,
+        error: "",
+        showDetails: {
+          initialization: true,
+          keyGeneration: true,
+          keyExtraction: true,
+          encryption: true,
+          decryption: true,
         },
       };
     },
@@ -830,6 +908,154 @@ function cryptoApp() {
         this.ibeState.error = `復号化エラー: ${error instanceof Error ? error.message : String(error)}`;
         this.ibeState.decrypted = "";
         this.ibeState.decryptedBytes = null;
+      }
+    },
+
+    /**
+     * ABEを初期化
+     */
+    async initializeABE() {
+      if (this.abeState.initialized) {
+        return;
+      }
+
+      try {
+        this.abeState.error = "";
+        await initABE();
+        this.abeState.initialized = true;
+      } catch (error) {
+        this.abeState.error = `初期化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.abeState.initialized = false;
+      }
+    },
+
+    /**
+     * ABEマスター鍵ペアを生成
+     */
+    async generateABEKeyPair() {
+      if (!this.abeState.initialized) {
+        await this.initializeABE();
+      }
+
+      try {
+        const result = await generateABEKeyPair();
+        this.abeState.masterKey = result.masterKey;
+        this.abeState.publicParams = result.publicParams;
+        this.abeState.error = "";
+      } catch (error) {
+        this.abeState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * ABE秘密鍵を抽出
+     */
+    async extractABEKey() {
+      if (!this.abeState.masterKey || !this.abeState.attributes.length) {
+        this.abeState.error = "マスター鍵と属性が必要です";
+        return;
+      }
+
+      try {
+        this.abeState.privateKey = await extractABEKey(
+          this.abeState.masterKey,
+          this.abeState.attributes
+        );
+        this.abeState.error = "";
+      } catch (error) {
+        this.abeState.error = `鍵抽出エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.abeState.privateKey = null;
+      }
+    },
+
+    /**
+     * 属性を追加
+     * カンマ区切りの入力もサポート（例: "A, B, C"）
+     */
+    addAttribute() {
+      const input = this.abeState.attributeInput.trim();
+      if (!input) {
+        return;
+      }
+
+      // カンマ区切りで分割し、各属性を追加
+      const attributes = input
+        .split(',')
+        .map(attr => attr.trim())
+        .filter(attr => attr.length > 0);
+
+      // 重複をチェックして追加
+      for (const attr of attributes) {
+        if (!this.abeState.attributes.includes(attr)) {
+          this.abeState.attributes.push(attr);
+        }
+      }
+
+      this.abeState.attributeInput = "";
+    },
+
+    /**
+     * 属性を削除
+     */
+    removeAttribute(index: number) {
+      this.abeState.attributes.splice(index, 1);
+    },
+
+    /**
+     * ABEで暗号化
+     */
+    async encryptABE() {
+      if (!this.abeState.publicParams || !this.abeState.policy || !this.abeState.plaintext) {
+        return;
+      }
+
+      try {
+        const plaintextBytes = this.stringToBytes(this.abeState.plaintext);
+        this.abeState.plaintextBytes = plaintextBytes;
+        this.abeState.ciphertext = await encryptABE(
+          this.abeState.publicParams,
+          this.abeState.policy,
+          plaintextBytes
+        );
+        this.abeState.error = "";
+      } catch (error) {
+        this.abeState.error = `暗号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.abeState.ciphertext = null;
+      }
+    },
+
+    /**
+     * ABEで復号化
+     */
+    async decryptABE() {
+      if (!this.abeState.privateKey || !this.abeState.ciphertext) {
+        return;
+      }
+
+      try {
+        const decryptedBytes = await decryptABE(
+          this.abeState.privateKey,
+          this.abeState.ciphertext
+        );
+        this.abeState.decryptedBytes = decryptedBytes;
+        this.abeState.decrypted = this.bytesToString(decryptedBytes);
+        this.abeState.decryptionSucceeded = true;
+        this.abeState.error = "";
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // 属性不一致のエラーを検出
+        if (errorMessage.includes("Attribute mismatch") || errorMessage.includes("属性が一致しません")) {
+          this.abeState.decryptionSucceeded = false;
+          this.abeState.error = "";
+        } else {
+          // その他のエラーは通常のエラーとして表示
+          this.abeState.error = `復号化エラー: ${errorMessage}`;
+          this.abeState.decryptionSucceeded = null;
+        }
+
+        this.abeState.decrypted = "";
+        this.abeState.decryptedBytes = null;
       }
     },
 
