@@ -34,6 +34,16 @@ import {
   generatePoly1305Key,
   verifyPoly1305MAC,
 } from "../symmetric/poly1305.js";
+import {
+  type IBEMasterKey,
+  type IBEPublicParams,
+  type IBEPrivateKey,
+  decryptIBE,
+  encryptIBE,
+  extractIBEKey,
+  generateIBEKeyPair,
+  initIBE,
+} from "../asymmetric/ibe.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -142,6 +152,28 @@ function cryptoApp() {
         signing: true,
         verification: true,
         ecdh: true,
+      },
+    },
+
+    // IBE状態
+    ibeState: {
+      initialized: false,
+      masterKey: null as IBEMasterKey | null,
+      publicParams: null as IBEPublicParams | null,
+      identity: "",
+      privateKey: null as IBEPrivateKey | null,
+      plaintext: "",
+      plaintextBytes: null as Uint8Array | null,
+      ciphertext: null as Uint8Array | null,
+      decrypted: "",
+      decryptedBytes: null as Uint8Array | null,
+      error: "",
+      showDetails: {
+        initialization: true,
+        keyGeneration: true,
+        keyExtraction: true,
+        encryption: true,
+        decryption: true,
       },
     },
 
@@ -697,6 +729,107 @@ function cryptoApp() {
       } catch (error) {
         this.eccState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
         this.eccState.verified = false;
+      }
+    },
+
+    // ========== IBE メソッド ==========
+
+    /**
+     * IBEを初期化
+     */
+    async initializeIBE() {
+      try {
+        this.ibeState.error = "";
+        await initIBE();
+        this.ibeState.initialized = true;
+      } catch (error) {
+        this.ibeState.error = `初期化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.ibeState.initialized = false;
+      }
+    },
+
+    /**
+     * IBEマスター鍵ペアを生成
+     */
+    async generateIBEKeyPair() {
+      if (!this.ibeState.initialized) {
+        await this.initializeIBE();
+      }
+
+      try {
+        const result = await generateIBEKeyPair();
+        this.ibeState.masterKey = result.masterKey;
+        this.ibeState.publicParams = result.publicParams;
+        this.ibeState.error = "";
+      } catch (error) {
+        this.ibeState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * IBE秘密鍵を抽出
+     */
+    async extractIBEKey() {
+      if (!this.ibeState.masterKey || !this.ibeState.identity) {
+        this.ibeState.error = "マスター鍵とアイデンティティが必要です";
+        return;
+      }
+
+      try {
+        this.ibeState.privateKey = await extractIBEKey(
+          this.ibeState.masterKey,
+          this.ibeState.identity
+        );
+        this.ibeState.error = "";
+      } catch (error) {
+        this.ibeState.error = `鍵抽出エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.ibeState.privateKey = null;
+      }
+    },
+
+    /**
+     * IBEで暗号化
+     */
+    async encryptIBE() {
+      if (!this.ibeState.publicParams || !this.ibeState.identity || !this.ibeState.plaintext) {
+        return;
+      }
+
+      try {
+        const plaintextBytes = this.stringToBytes(this.ibeState.plaintext);
+        this.ibeState.plaintextBytes = plaintextBytes;
+        this.ibeState.ciphertext = await encryptIBE(
+          this.ibeState.publicParams,
+          this.ibeState.identity,
+          plaintextBytes
+        );
+        this.ibeState.error = "";
+      } catch (error) {
+        this.ibeState.error = `暗号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.ibeState.ciphertext = null;
+      }
+    },
+
+    /**
+     * IBEで復号化
+     */
+    async decryptIBE() {
+      if (!this.ibeState.privateKey || !this.ibeState.ciphertext) {
+        return;
+      }
+
+      try {
+        const decryptedBytes = await decryptIBE(
+          this.ibeState.privateKey,
+          this.ibeState.ciphertext
+        );
+        this.ibeState.decryptedBytes = decryptedBytes;
+        this.ibeState.decrypted = this.bytesToString(decryptedBytes);
+        this.ibeState.error = "";
+      } catch (error) {
+        this.ibeState.error = `復号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.ibeState.decrypted = "";
+        this.ibeState.decryptedBytes = null;
       }
     },
 

@@ -10,3 +10,7 @@ coverage/
 *.swo
 *~
 
+# WebAssembly build artifacts
+wasm-src/**/pkg/
+wasm-src/**/target/
+

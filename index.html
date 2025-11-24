@@ -320,6 +320,7 @@
         <optgroup label="非対称鍵暗号">
           <option value="rsa">RSA (Rivest-Shamir-Adleman)</option>
           <option value="ecc">ECC (Elliptic Curve Cryptography)</option>
+          <option value="ibe">IBE (Identity-Based Encryption)</option>
         </optgroup>
       </select>
     </div>
@@ -1864,6 +1865,437 @@
             </div>
             <div x-show="eccState.error" style="color: #e74c3c; margin-top: 10px;" x-text="eccState.error"></div>
           </div>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="selectedCrypto === 'ibe'">
+      <div>
+        <div class="section">
+          <h2>IBE (Identity-Based Encryption) の動作</h2>
+          <div class="info">
+            <strong>Boneh-Franklin IBEスキーム</strong><br />
+            IDベース暗号は、公開鍵がユーザーのアイデンティティ（メールアドレスなど）である暗号方式です。
+          </div>
+
+          <!-- 初期化 -->
+          <div class="subsection">
+            <h3>1. 初期化</h3>
+            <button @click="initializeIBE()" :disabled="ibeState.initialized">WebAssemblyモジュールを初期化</button>
+            <div x-show="ibeState.initialized" class="output">✅ 初期化完了</div>
+            <div x-show="ibeState.showDetails.initialization && ibeState.initialized" class="detail-section">
+              <div class="data-box">
+                <div class="data-box-header">初期化完了</div>
+                <div class="data-box-content">
+                  Boneh-Franklin IBEスキームが使用可能になりました。Setup、Extract、Encrypt、Decryptの各操作を実行できます。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- マスター鍵生成 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="ibeState.showDetails.keyGeneration = !ibeState.showDetails.keyGeneration"
+                x-show="ibeState.masterKey">
+                <span x-show="!ibeState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="ibeState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+              2. マスター鍵ペアの生成
+            </h3>
+            <button @click="generateIBEKeyPair()" :disabled="!ibeState.initialized">マスター鍵ペアを生成</button>
+            <div x-show="ibeState.masterKey" class="output">
+              <div>マスター鍵: <span x-text="formatBytes(ibeState.masterKey?.secret || null)"></span></div>
+              <div>公開パラメータ: <span x-text="formatBytes(ibeState.publicParams?.params || null)"></span></div>
+            </div>
+            <div x-show="ibeState.showDetails.keyGeneration && ibeState.masterKey" class="detail-section">
+              <h4>🔍 マスター鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. ランダムなマスター秘密鍵sを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    getrandomを使用して暗号学的に安全な乱数を生成<br />
+                    曲線の位数で剰余を取る
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 生成元Pを取得</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ECP::generator() で楕円曲線の生成元を取得
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 公開パラメータP_pubを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    P_pub = sP<br />
+                    （楕円曲線上のスカラー倍算）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. マスター鍵s（32バイト）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.masterKey?.secret || null)"></div>
+                  <div class="param-label">長さ: <span x-text="ibeState.masterKey?.secret?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 公開パラメータP_pub</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.publicParams?.params || null)">
+                  </div>
+                  <div class="param-label">長さ: <span x-text="ibeState.publicParams?.params?.length || 0"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="ibeState.masterKey?.secret">
+                <h4>マスター鍵のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(ibeState.masterKey?.secret || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Setupアルゴリズム: マスター秘密鍵sをランダムに選択します。この鍵は秘密情報として厳重に管理する必要があります。<br />
+                2. 公開パラメータP_pub = sPを計算します。Pは楕円曲線（BN254）の生成元です。<br />
+                3. マスター鍵sは32バイト（256ビット）のBIG型として保存されます。<br />
+                4. 公開パラメータP_pubは楕円曲線上の点（ECP）として、65バイトでエンコードされます。<br />
+                5. この公開パラメータは、すべてのユーザーに公開され、暗号化に使用されます。
+              </div>
+            </div>
+          </div>
+
+          <!-- 秘密鍵抽出 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="ibeState.showDetails.keyExtraction = !ibeState.showDetails.keyExtraction"
+                x-show="ibeState.privateKey">
+                <span x-show="!ibeState.showDetails.keyExtraction">詳細を表示</span>
+                <span x-show="ibeState.showDetails.keyExtraction">詳細を隠す</span>
+              </button>
+              3. アイデンティティから秘密鍵を抽出
+            </h3>
+            <label>アイデンティティ（例: user@example.com）:</label>
+            <input type="text" x-model="ibeState.identity" placeholder="user@example.com" />
+            <button @click="extractIBEKey()" :disabled="!ibeState.masterKey || !ibeState.identity">秘密鍵を抽出</button>
+            <div x-show="ibeState.privateKey" class="output">
+              秘密鍵: <span x-text="formatBytes(ibeState.privateKey?.key || null)"></span>
+            </div>
+            <div x-show="ibeState.showDetails.keyExtraction && ibeState.privateKey" class="detail-section">
+              <h4>🔍 鍵抽出の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. アイデンティティID（文字列）</div>
+                  <div class="data-box-content" x-text="ibeState.identity || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. SHA-256でハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    H(ID) = SHA-256(ID)<br />
+                    32バイトのハッシュ値を生成
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ハッシュからBIG型に変換</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ハッシュ値をBIG型に変換し、<br />
+                    曲線の位数で剰余を取る
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. ECP2の生成元で点を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    H_ID = h × G2<br />
+                    （G2はECP2の生成元）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 秘密鍵d_IDを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    d_ID = s × H_ID<br />
+                    （マスター鍵sでスカラー倍算）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 抽出された秘密鍵d_ID</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.privateKey?.key || null)"></div>
+                  <div class="param-label">長さ: <span x-text="ibeState.privateKey?.key?.length || 0"></span> バイト</div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Extractアルゴリズム: アイデンティティID（例: メールアドレス）を入力として受け取ります。<br />
+                2. IDをSHA-256でハッシュ化し、32バイトのハッシュ値を生成します。<br />
+                3. ハッシュ値を楕円曲線上の点H(ID)にマッピングします。これはECP2（拡張楕円曲線上の点）です。<br />
+                4. マスター秘密鍵sを使用して、秘密鍵d_ID = sH(ID)を計算します。<br />
+                5. この秘密鍵d_IDは、そのアイデンティティに対応するメッセージを復号化するために使用されます。<br />
+                6. 秘密鍵は130バイト（ECP2の圧縮なしエンコーディング）で保存されます。
+              </div>
+            </div>
+          </div>
+
+          <!-- 暗号化 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle" @click="ibeState.showDetails.encryption = !ibeState.showDetails.encryption"
+                x-show="ibeState.ciphertext">
+                <span x-show="!ibeState.showDetails.encryption">詳細を表示</span>
+                <span x-show="ibeState.showDetails.encryption">詳細を隠す</span>
+              </button>
+              4. メッセージの暗号化
+            </h3>
+            <label>平文:</label>
+            <textarea x-model="ibeState.plaintext" placeholder="暗号化するメッセージを入力"></textarea>
+            <button @click="encryptIBE()"
+              :disabled="!ibeState.publicParams || !ibeState.identity || !ibeState.plaintext">暗号化</button>
+            <div x-show="ibeState.ciphertext" class="output">
+              暗号文: <span x-text="formatBytes(ibeState.ciphertext)"></span>
+            </div>
+            <div x-show="ibeState.showDetails.encryption && ibeState.ciphertext" class="detail-section">
+              <h4>🔍 暗号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="ibeState.plaintext || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.plaintextBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="ibeState.plaintextBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ランダムなrを選択</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    getrandomを使用して暗号学的に安全な乱数rを生成<br />
+                    曲線の位数で剰余を取る
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. U = rPを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    U = r × P<br />
+                    （PはECPの生成元、Uは暗号文の一部）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. H(ID)を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHA-256(ID) → BIG → ECP2上の点H_ID<br />
+                    （鍵抽出と同じ処理）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. ペアリング演算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    e(H_ID, P_pub) を計算<br />
+                    pair::ate() + pair::fexp()
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">7. r乗する</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    e(H_ID, P_pub)^r<br />
+                    （FP12型のべき乗演算）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">8. ハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    H(e(H_ID, P_pub)^r)<br />
+                    FP12をバイト列に変換 → SHA-256
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">9. XOR演算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    V = M ⊕ H(e(H_ID, P_pub)^r)<br />
+                    メッセージとハッシュ値をXOR
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">10. 暗号文C = (U, V)</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="ibeState.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="ibeState.plaintextBytes">
+                <h4>平文のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(ibeState.plaintextBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Encryptアルゴリズム: 公開パラメータP_pubとアイデンティティIDを使用してメッセージを暗号化します。<br />
+                2. ランダムな値rを選択し、U = rPを計算します。Uは暗号文の一部として送信されます。<br />
+                3. アイデンティティIDをハッシュ化してH(ID)を計算します（鍵抽出と同じ処理）。<br />
+                4. ペアリング演算e(H(ID), P_pub)を計算し、r乗します。これにより、e(H(ID), P_pub)^rが得られます。<br />
+                5. ペアリング演算の結果をハッシュ化して、32バイトの鍵を生成します。<br />
+                6. この鍵とメッセージをXOR演算して、Vを計算します。<br />
+                7. 暗号文はC = (U, V)の形式で、Uは65バイト（ECP）、Vはメッセージと同じ長さです。
+              </div>
+            </div>
+          </div>
+
+          <!-- 復号化 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle" @click="ibeState.showDetails.decryption = !ibeState.showDetails.decryption"
+                x-show="ibeState.decrypted">
+                <span x-show="!ibeState.showDetails.decryption">詳細を表示</span>
+                <span x-show="ibeState.showDetails.decryption">詳細を隠す</span>
+              </button>
+              5. 暗号文の復号化
+            </h3>
+            <button @click="decryptIBE()" :disabled="!ibeState.privateKey || !ibeState.ciphertext">復号化</button>
+            <div x-show="ibeState.decrypted" class="output">
+              復号化されたメッセージ: <span x-text="ibeState.decrypted"></span>
+            </div>
+            <div x-show="ibeState.showDetails.decryption && ibeState.decryptedBytes" class="detail-section">
+              <h4>🔍 復号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（暗号文C = (U, V)）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="ibeState.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 暗号文を解析</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    U = 暗号文の最初の65バイト（ECP）<br />
+                    V = 残りのバイト（XORされたメッセージ）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ペアリング演算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    e(d_ID, U) を計算<br />
+                    pair::ate(d_ID, U) + pair::fexp()<br />
+                    （d_IDは秘密鍵、Uは暗号文の一部）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. ハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    H(e(d_ID, U))<br />
+                    FP12をバイト列に変換 → SHA-256<br />
+                    （32バイトの鍵を生成）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. XOR演算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    M = V ⊕ H(e(d_ID, U))<br />
+                    Vとハッシュ値をXORしてメッセージを復元
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. バイト配列を文字列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(ibeState.decryptedBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="ibeState.decryptedBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">7. 出力（文字列）</div>
+                  <div class="data-box-content" x-text="ibeState.decrypted"></div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="ibeState.decryptedBytes">
+                <h4>復号化されたバイトの詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(ibeState.decryptedBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. Decryptアルゴリズム: 秘密鍵d_IDと暗号文C = (U, V)を使用してメッセージを復号化します。<br />
+                2. 暗号文を解析して、U（65バイト）とV（残りのバイト）に分離します。<br />
+                3. ペアリング演算e(d_ID, U)を計算します。数学的には、e(d_ID, U) = e(sH(ID), rP) = e(H(ID), P)^(sr)となります。<br />
+                4. 暗号化時にはe(H(ID), P_pub)^r = e(H(ID), sP)^r = e(H(ID), P)^(sr)を計算したので、これらは等しくなります。<br />
+                5. ペアリング演算の結果をハッシュ化して、32バイトの鍵を生成します（暗号化時と同じ鍵）。<br />
+                6. この鍵とVをXOR演算して、元のメッセージMを復元します。<br />
+                7. バイト配列をUTF-8文字列に変換して、最終的なメッセージを取得します。
+              </div>
+            </div>
+          </div>
+
+          <div x-show="ibeState.error" style="color: #e74c3c; margin-top: 10px;" x-text="ibeState.error"></div>
         </div>
       </div>
     </template>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBE WebAssembly テスト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>IBE WebAssembly 動作確認</h1>
+    <button id="testBtn">テスト実行</button>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initIBE, testIBE } from './src/asymmetric/ibe.js';
+
+        const resultsDiv = document.getElementById('results');
+        const testBtn = document.getElementById('testBtn');
+
+        function addResult(message, isSuccess) {
+            const div = document.createElement('div');
+            div.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            div.textContent = message;
+            resultsDiv.appendChild(div);
+        }
+
+        testBtn.addEventListener('click', async () => {
+            resultsDiv.innerHTML = '';
+            addResult('テストを開始します...', true);
+
+            try {
+                // 初期化テスト
+                addResult('WebAssemblyモジュールを初期化中...', true);
+                await initIBE();
+                addResult('✅ 初期化成功', true);
+
+                // 基本的な関数のテスト
+                addResult('基本的な関数（add）をテスト中...', true);
+                const result = await testIBE();
+                if (result === 5) {
+                    addResult(`✅ add(2, 3) = ${result} (期待値: 5)`, true);
+                } else {
+                    addResult(`❌ add(2, 3) = ${result} (期待値: 5)`, false);
+                }
+
+                addResult('すべてのテストが完了しました！', true);
+            } catch (error) {
+                addResult(`❌ エラー: ${error.message}`, false);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>
+
