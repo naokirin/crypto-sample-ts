@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>暗号技術サンプル - Crypto Sample TS</title>
+  <script type="module" src="/src/web/main.ts"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+        sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+      color: #2c3e50;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 10px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 6px;
+      border-left: 4px solid #3498db;
+    }
+
+    .section h2 {
+      margin-bottom: 15px;
+      color: #2c3e50;
+      font-size: 1.3em;
+    }
+
+    .section h3 {
+      margin-top: 20px;
+      margin-bottom: 10px;
+      color: #34495e;
+      font-size: 1.1em;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    select,
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    select {
+      background: white;
+      cursor: pointer;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+      font-family: "Courier New", monospace;
+    }
+
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.3s;
+      margin-right: 10px;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    button:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    .output {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: "Courier New", monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 10px;
+      overflow-x: auto;
+    }
+
+    .error {
+      background: #e74c3c;
+      color: white;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+
+    .info {
+      background: #3498db;
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .param-group {
+      margin-bottom: 15px;
+    }
+
+    .param-label {
+      font-size: 12px;
+      color: #7f8c8d;
+      margin-top: 5px;
+    }
+
+    .step {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .step-title {
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+    }
+
+    .step-number {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: #3498db;
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 24px;
+      font-size: 12px;
+      margin-right: 10px;
+    }
+
+    .detail-toggle {
+      background: #95a5a6;
+      font-size: 12px;
+      padding: 6px 12px;
+      margin-left: 10px;
+    }
+
+    .detail-toggle:hover {
+      background: #7f8c8d;
+    }
+
+    .detail-section {
+      margin-top: 15px;
+      padding: 15px;
+      background: #ecf0f1;
+      border-radius: 4px;
+      border-left: 3px solid #3498db;
+    }
+
+    .detail-section h4 {
+      margin-bottom: 10px;
+      color: #2c3e50;
+      font-size: 14px;
+    }
+
+    .data-flow {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .data-box {
+      padding: 10px;
+      background: white;
+      border: 1px solid #bdc3c7;
+      border-radius: 4px;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .data-box-label {
+      font-size: 11px;
+      color: #7f8c8d;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .data-box-content {
+      font-family: "Courier New", monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .arrow {
+      font-size: 20px;
+      color: #3498db;
+      font-weight: bold;
+    }
+
+    .bytes-detail {
+      margin-top: 10px;
+    }
+
+    .bytes-detail table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      background: white;
+    }
+
+    .bytes-detail th,
+    .bytes-detail td {
+      padding: 5px;
+      border: 1px solid #bdc3c7;
+      text-align: left;
+    }
+
+    .bytes-detail th {
+      background: #34495e;
+      color: white;
+      font-weight: 600;
+    }
+
+    .bytes-detail td {
+      font-family: "Courier New", monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" x-data="window.cryptoApp && window.cryptoApp() || {}">
+    <h1>🔐 暗号技術サンプルデモ</h1>
+
+    <div class="section">
+      <h2>暗号技術の選択</h2>
+      <label for="crypto-select">暗号技術を選択してください:</label>
+      <select id="crypto-select" x-model="selectedCrypto" @change="resetState()">
+        <option value="">選択してください</option>
+        <optgroup label="対称鍵暗号">
+          <option value="aes">AES (Advanced Encryption Standard)</option>
+          <option value="chacha20">ChaCha20</option>
+          <option value="poly1305">Poly1305 (MAC)</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <template x-if="selectedCrypto && selectedCrypto.startsWith('aes')">
+      <div>
+        <div class="section">
+          <h2>AES-GCM の動作</h2>
+          <div class="info">
+            <strong>初期化パラメータ:</strong><br />
+            鍵長: 256ビット (32バイト)<br />
+            IV長: 96ビット (12バイト)<br />
+            認証タグ長: 128ビット (16バイト)
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              鍵生成
+              <button class="detail-toggle"
+                @click="aesState.showDetails.keyGeneration = !aesState.showDetails.keyGeneration" x-show="aesState.key">
+                <span x-show="!aesState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="aesState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="generateAESKey()">鍵を生成</button>
+            <div x-show="aesState.key" class="output" x-text="formatBytes(aesState.key)"></div>
+            <div x-show="aesState.showDetails.keyGeneration && aesState.key" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    CSPRNG（暗号学的擬似乱数生成器）を使用
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 256ビット（32バイト）の鍵を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各バイトは0x00～0xFFのランダムな値
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 生成された鍵</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(aesState.key)"></div>
+                  <div class="param-label">
+                    長さ: <span x-text="aesState.key?.length || 0"></span> バイト（<span
+                      x-text="(aesState.key?.length || 0) * 8"></span>
+                    ビット）
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="aesState.key">
+                <h4>鍵のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(aesState.key || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 暗号学的に安全な乱数生成器（CSPRNG）を使用して、予測不可能なランダムなバイト列を生成します。<br />
+                2. AES-256では256ビット（32バイト）の鍵を使用します。この鍵長は、現在の標準的なセキュリティレベルを提供します。<br />
+                3. 生成された鍵は秘密情報として扱い、安全に保管する必要があります。同じ鍵を使用することで、暗号化と復号化が可能になります。<br />
+                4. 鍵は毎回ランダムに生成されるため、同じ平文でも異なる暗号文が生成されます（IVもランダムに生成されるため）。
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              暗号化
+              <button class="detail-toggle" @click="aesState.showDetails.encryption = !aesState.showDetails.encryption"
+                x-show="aesState.ciphertext">
+                <span x-show="!aesState.showDetails.encryption">詳細を表示</span>
+                <span x-show="aesState.showDetails.encryption">詳細を隠す</span>
+              </button>
+            </div>
+            <div class="param-group">
+              <label>平文:</label>
+              <textarea x-model="aesState.plaintext" placeholder="暗号化するテキストを入力"></textarea>
+            </div>
+            <button @click="encryptAES()" :disabled="!aesState.key || !aesState.plaintext">
+              暗号化
+            </button>
+            <div x-show="aesState.ciphertext" class="output">
+              <strong>暗号文:</strong><br />
+              <span x-text="formatBytes(aesState.ciphertext)"></span><br /><br />
+              <strong>IV:</strong><br />
+              <span x-text="formatBytes(aesState.iv)"></span><br /><br />
+              <strong>認証タグ:</strong><br />
+              <span x-text="formatBytes(aesState.authTag)"></span>
+            </div>
+            <div x-show="aesState.showDetails.encryption && aesState.ciphertext" class="detail-section">
+              <h4>🔍 暗号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="aesState.plaintext || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(aesState.plaintextBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="aesState.plaintextBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. AES-GCMで暗号化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    鍵 + IV + 平文 → 暗号文 + 認証タグ
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 出力（暗号文）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(aesState.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="aesState.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="aesState.plaintextBytes">
+                <h4>平文のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(aesState.plaintextBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0')"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 平文をUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. AES-GCMモードで暗号化します。GCMは認証付き暗号（AEAD）で、暗号化と同時に認証タグを生成します。<br />
+                3. IV（初期化ベクトル）はランダムに生成され、同じ平文でも異なる暗号文になります。<br />
+                4. 認証タグはデータの完全性を保証するために使用されます。
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              復号化
+              <button class="detail-toggle" @click="aesState.showDetails.decryption = !aesState.showDetails.decryption"
+                x-show="aesState.decrypted">
+                <span x-show="!aesState.showDetails.decryption">詳細を表示</span>
+                <span x-show="aesState.showDetails.decryption">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="decryptAES()" :disabled="!aesState.ciphertext">復号化</button>
+            <div x-show="aesState.decrypted" class="output" x-text="aesState.decrypted"></div>
+            <div x-show="aesState.error" class="error" x-text="aesState.error"></div>
+            <div x-show="aesState.showDetails.decryption && aesState.decrypted" class="detail-section">
+              <h4>🔍 復号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（暗号文）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(aesState.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="aesState.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 認証タグで検証</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号文 + IV + 認証タグ → 認証チェック
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. AES-GCMで復号</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    鍵 + IV + 暗号文 → 平文バイト配列
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. バイト配列を文字列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(aesState.decryptedBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="aesState.decryptedBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（文字列）</div>
+                  <div class="data-box-content" x-text="aesState.decrypted"></div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 暗号文、IV、認証タグを使用して復号化します。<br />
+                2. 認証タグを検証し、データが改ざんされていないことを確認します。<br />
+                3. 認証が成功した場合のみ、暗号文を平文に復号します。<br />
+                4. 復号されたバイト配列をUTF-8デコードして文字列に変換します。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="selectedCrypto === 'chacha20'">
+      <div>
+        <div class="section">
+          <h2>XChaCha20-Poly1305 の動作</h2>
+          <div class="info">
+            <strong>初期化パラメータ:</strong><br />
+            鍵長: 256ビット (32バイト)<br />
+            ノンス長: 192ビット (24バイト)<br />
+            認証タグ長: 128ビット (16バイト)
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              鍵生成
+              <button class="detail-toggle"
+                @click="chacha20State.showDetails.keyGeneration = !chacha20State.showDetails.keyGeneration"
+                x-show="chacha20State.key">
+                <span x-show="!chacha20State.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="chacha20State.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="generateChaCha20Key()">鍵を生成</button>
+            <div x-show="chacha20State.key" class="output" x-text="formatBytes(chacha20State.key)"></div>
+            <div x-show="chacha20State.showDetails.keyGeneration && chacha20State.key" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    CSPRNG（暗号学的擬似乱数生成器）を使用
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 256ビット（32バイト）の鍵を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各バイトは0x00～0xFFのランダムな値
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 生成された鍵</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(chacha20State.key)"></div>
+                  <div class="param-label">
+                    長さ: <span x-text="chacha20State.key?.length || 0"></span> バイト（<span
+                      x-text="(chacha20State.key?.length || 0) * 8"></span>
+                    ビット）
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="chacha20State.key">
+                <h4>鍵のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(chacha20State.key || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 暗号学的に安全な乱数生成器（CSPRNG）を使用して、予測不可能なランダムなバイト列を生成します。<br />
+                2. XChaCha20-Poly1305では256ビット（32バイト）の鍵を使用します。この鍵長は、高いセキュリティレベルを提供します。<br />
+                3. 生成された鍵は秘密情報として扱い、安全に保管する必要があります。同じ鍵を使用することで、暗号化と復号化が可能になります。<br />
+                4. 鍵は毎回ランダムに生成されるため、同じ平文でも異なる暗号文が生成されます（ノンスもランダムに生成されるため）。
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              暗号化
+              <button class="detail-toggle"
+                @click="chacha20State.showDetails.encryption = !chacha20State.showDetails.encryption"
+                x-show="chacha20State.ciphertext">
+                <span x-show="!chacha20State.showDetails.encryption">詳細を表示</span>
+                <span x-show="chacha20State.showDetails.encryption">詳細を隠す</span>
+              </button>
+            </div>
+            <div class="param-group">
+              <label>平文:</label>
+              <textarea x-model="chacha20State.plaintext" placeholder="暗号化するテキストを入力"></textarea>
+            </div>
+            <button @click="encryptChaCha20()" :disabled="!chacha20State.key || !chacha20State.plaintext">
+              暗号化
+            </button>
+            <div x-show="chacha20State.ciphertext" class="output">
+              <strong>暗号文:</strong><br />
+              <span x-text="formatBytes(chacha20State.ciphertext)"></span><br /><br />
+              <strong>ノンス:</strong><br />
+              <span x-text="formatBytes(chacha20State.nonce)"></span><br /><br />
+              <strong>認証タグ:</strong><br />
+              <span x-text="formatBytes(chacha20State.authTag)"></span>
+            </div>
+            <div x-show="chacha20State.showDetails.encryption && chacha20State.ciphertext" class="detail-section">
+              <h4>🔍 暗号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="chacha20State.plaintext || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(chacha20State.plaintextBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="chacha20State.plaintextBytes?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. XChaCha20-Poly1305で暗号化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    鍵 + ノンス + 平文 → 暗号文 + 認証タグ
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 出力（暗号文）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(chacha20State.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="chacha20State.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 平文をUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. XChaCha20-Poly1305（認証付き暗号）で暗号化します。ChaCha20はストリーム暗号で、Poly1305は認証タグを生成します。<br />
+                3. ノンス（nonce）はランダムに生成され、同じ平文でも異なる暗号文になります。<br />
+                4. 認証タグはデータの完全性を保証するために使用されます。
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              復号化
+              <button class="detail-toggle"
+                @click="chacha20State.showDetails.decryption = !chacha20State.showDetails.decryption"
+                x-show="chacha20State.decrypted">
+                <span x-show="!chacha20State.showDetails.decryption">詳細を表示</span>
+                <span x-show="chacha20State.showDetails.decryption">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="decryptChaCha20()" :disabled="!chacha20State.ciphertext">
+              復号化
+            </button>
+            <div x-show="chacha20State.decrypted" class="output" x-text="chacha20State.decrypted"></div>
+            <div x-show="chacha20State.error" class="error" x-text="chacha20State.error"></div>
+            <div x-show="chacha20State.showDetails.decryption && chacha20State.decrypted" class="detail-section">
+              <h4>🔍 復号化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（暗号文）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(chacha20State.ciphertext)"></div>
+                  <div class="param-label">長さ: <span x-text="chacha20State.ciphertext?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 認証タグで検証</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号文 + ノンス + 認証タグ → 認証チェック
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. XChaCha20-Poly1305で復号</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    鍵 + ノンス + 暗号文 → 平文バイト配列
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. バイト配列を文字列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(chacha20State.decryptedBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="chacha20State.decryptedBytes?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（文字列）</div>
+                  <div class="data-box-content" x-text="chacha20State.decrypted"></div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 暗号文、ノンス、認証タグを使用して復号化します。<br />
+                2. Poly1305で認証タグを検証し、データが改ざんされていないことを確認します。<br />
+                3. 認証が成功した場合のみ、ChaCha20で暗号文を平文に復号します。<br />
+                4. 復号されたバイト配列をUTF-8デコードして文字列に変換します。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="selectedCrypto === 'poly1305'">
+      <div>
+        <div class="section">
+          <h2>Poly1305 (MAC) の動作</h2>
+          <div class="info">
+            <strong>初期化パラメータ:</strong><br />
+            鍵長: 256ビット (32バイト)<br />
+            認証タグ長: 128ビット (16バイト)
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              鍵生成
+              <button class="detail-toggle"
+                @click="poly1305State.showDetails.keyGeneration = !poly1305State.showDetails.keyGeneration"
+                x-show="poly1305State.key">
+                <span x-show="!poly1305State.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="poly1305State.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="generatePoly1305Key()">鍵を生成</button>
+            <div x-show="poly1305State.key" class="output" x-text="formatBytes(poly1305State.key)"></div>
+            <div x-show="poly1305State.showDetails.keyGeneration && poly1305State.key" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    CSPRNG（暗号学的擬似乱数生成器）を使用
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 256ビット（32バイト）の鍵を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各バイトは0x00～0xFFのランダムな値
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 生成された鍵</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(poly1305State.key)"></div>
+                  <div class="param-label">
+                    長さ: <span x-text="poly1305State.key?.length || 0"></span> バイト（<span
+                      x-text="(poly1305State.key?.length || 0) * 8"></span>
+                    ビット）
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="poly1305State.key">
+                <h4>鍵のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(poly1305State.key || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 暗号学的に安全な乱数生成器（CSPRNG）を使用して、予測不可能なランダムなバイト列を生成します。<br />
+                2. Poly1305では256ビット（32バイト）の鍵を使用します。この鍵長は、MAC（メッセージ認証コード）のセキュリティを保証します。<br />
+                3. 生成された鍵は秘密情報として扱い、安全に保管する必要があります。同じ鍵を使用することで、MACの計算と検証が可能になります。<br />
+                4. 鍵は毎回ランダムに生成されるため、同じメッセージでも異なる認証タグが生成されます（実際には同じメッセージと鍵からは同じ認証タグが生成されます）。
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              MAC計算
+              <button class="detail-toggle" @click="poly1305State.showDetails.mac = !poly1305State.showDetails.mac"
+                x-show="poly1305State.tag">
+                <span x-show="!poly1305State.showDetails.mac">詳細を表示</span>
+                <span x-show="poly1305State.showDetails.mac">詳細を隠す</span>
+              </button>
+            </div>
+            <div class="param-group">
+              <label>メッセージ:</label>
+              <textarea x-model="poly1305State.message" placeholder="MACを計算するメッセージを入力"></textarea>
+            </div>
+            <button @click="computePoly1305MAC()" :disabled="!poly1305State.key || !poly1305State.message">
+              MACを計算
+            </button>
+            <div x-show="poly1305State.tag" class="output">
+              <strong>認証タグ:</strong><br />
+              <span x-text="formatBytes(poly1305State.tag)"></span>
+            </div>
+            <div x-show="poly1305State.showDetails.mac && poly1305State.tag" class="detail-section">
+              <h4>🔍 MAC計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="poly1305State.message || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(poly1305State.messageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="poly1305State.messageBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. Poly1305でMAC計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    鍵 + メッセージ → 認証タグ（128ビット）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 出力（認証タグ）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(poly1305State.tag)"></div>
+                  <div class="param-label">長さ: <span x-text="poly1305State.tag?.length || 0"></span> バイト（128ビット）</div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. メッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. Poly1305アルゴリズムを使用して、鍵とメッセージから認証タグ（MAC）を計算します。<br />
+                3. 認証タグは128ビット（16バイト）の固定長で、メッセージの完全性と真正性を保証します。<br />
+                4. 同じ鍵とメッセージからは常に同じ認証タグが生成されます。
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              MAC検証
+              <button class="detail-toggle"
+                @click="poly1305State.showDetails.verification = !poly1305State.showDetails.verification"
+                x-show="poly1305State.verified !== null">
+                <span x-show="!poly1305State.showDetails.verification">詳細を表示</span>
+                <span x-show="poly1305State.showDetails.verification">詳細を隠す</span>
+              </button>
+            </div>
+            <div class="param-group">
+              <label>検証するメッセージ:</label>
+              <textarea x-model="poly1305State.verificationMessage"
+                placeholder="検証するメッセージを入力（MAC計算時のメッセージと同じ場合は検証成功、異なる場合は検証失敗）"></textarea>
+              <div class="param-label" style="margin-top: 5px;">
+                <span x-show="poly1305State.message && poly1305State.verificationMessage">
+                  <span x-show="poly1305State.message === poly1305State.verificationMessage" style="color: #2ecc71;">
+                    ✓ MAC計算時のメッセージと一致
+                  </span>
+                  <span x-show="poly1305State.message !== poly1305State.verificationMessage" style="color: #e74c3c;">
+                    ✗ MAC計算時のメッセージと異なります（検証は失敗します）
+                  </span>
+                </span>
+              </div>
+            </div>
+            <button @click="verifyPoly1305MAC()" :disabled="!poly1305State.tag || !poly1305State.verificationMessage">
+              MACを検証
+            </button>
+            <div x-show="poly1305State.verified !== null" class="output">
+              <span x-show="poly1305State.verified" style="color: #2ecc71; font-weight: bold">
+                ✓ 検証成功
+              </span>
+              <span x-show="!poly1305State.verified" style="color: #e74c3c; font-weight: bold">
+                ✗ 検証失敗
+              </span>
+            </div>
+            <div x-show="poly1305State.error" class="error" x-text="poly1305State.error"></div>
+            <div x-show="poly1305State.showDetails.verification && poly1305State.verified !== null"
+              class="detail-section">
+              <h4>🔍 MAC検証の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 検証するメッセージ（文字列）</div>
+                  <div class="data-box-content" x-text="poly1305State.verificationMessage || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(poly1305State.verificationMessageBytes)">
+                  </div>
+                  <div class="param-label">長さ: <span
+                      x-text="poly1305State.verificationMessageBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. Poly1305でMAC再計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    鍵 + 検証メッセージ → 新しい認証タグ
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 認証タグを比較</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    計算されたタグ vs 提供されたタグ<br />
+                    <span x-show="poly1305State.verified" style="color: #2ecc71">✓ 一致</span>
+                    <span x-show="!poly1305State.verified" style="color: #e74c3c">✗ 不一致</span>
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 検証結果</div>
+                  <div class="data-box-content">
+                    <span x-show="poly1305State.verified" style="color: #2ecc71; font-weight: bold">
+                      ✓ 検証成功（データは改ざんされていません）
+                    </span>
+                    <span x-show="!poly1305State.verified" style="color: #e74c3c; font-weight: bold">
+                      ✗ 検証失敗（データが改ざんされている可能性があります）
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div x-show="poly1305State.message && poly1305State.verificationMessage"
+                style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 12px; border-left: 3px solid #ffc107;">
+                <strong>メッセージ比較:</strong><br />
+                <strong>MAC計算時のメッセージ:</strong> <span x-text="poly1305State.message"></span><br />
+                <strong>検証時のメッセージ:</strong> <span x-text="poly1305State.verificationMessage"></span><br />
+                <span x-show="poly1305State.message === poly1305State.verificationMessage"
+                  style="color: #2ecc71; font-weight: bold;">
+                  ✓ メッセージが一致しているため、検証は成功します
+                </span>
+                <span x-show="poly1305State.message !== poly1305State.verificationMessage"
+                  style="color: #e74c3c; font-weight: bold;">
+                  ✗ メッセージが異なるため、検証は失敗します（メッセージが改ざんされたことを検出）
+                </span>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 検証するメッセージをバイト配列に変換します。<br />
+                2. 同じ鍵を使用して、メッセージから認証タグを再計算します。<br />
+                3. 再計算された認証タグと提供された認証タグを定時間比較します（タイミング攻撃を防ぐため）。<br />
+                4. 認証タグが一致する場合、メッセージは改ざんされていないことが確認されます。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</body>
+
+</html>
