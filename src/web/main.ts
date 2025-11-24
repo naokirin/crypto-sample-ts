@@ -1,14 +1,14 @@
 import {
+  type AesEncryptionResult,
   decryptAES,
   encryptAES,
   generateAESKey,
-  type AesEncryptionResult,
 } from "../symmetric/aes.js";
 import {
+  type ChaCha20EncryptionResult,
   decryptChaCha20,
   encryptChaCha20,
   generateChaCha20Key,
-  type ChaCha20EncryptionResult,
 } from "../symmetric/chacha20.js";
 import {
   computePoly1305MAC,
@@ -375,7 +375,11 @@ function cryptoApp() {
      * Poly1305でMACを検証
      */
     verifyPoly1305MAC() {
-      if (!this.poly1305State.key || !this.poly1305State.tag || !this.poly1305State.verificationMessage) {
+      if (
+        !this.poly1305State.key ||
+        !this.poly1305State.tag ||
+        !this.poly1305State.verificationMessage
+      ) {
         return;
       }
 
@@ -408,4 +412,3 @@ declare const window: Window & typeof globalThis;
 if (typeof window !== "undefined") {
   window.cryptoApp = cryptoApp;
 }
-

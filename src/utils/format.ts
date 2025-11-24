@@ -30,8 +30,8 @@ export function hexToBytes(hex: string): Uint8Array {
   }
   const bytes = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
-    const byte = parseInt(cleanHex.substring(i, i + 2), 16);
-    if (isNaN(byte)) {
+    const byte = Number.parseInt(cleanHex.substring(i, i + 2), 16);
+    if (Number.isNaN(byte)) {
       throw new Error(`Invalid hex string: invalid character at position ${i}`);
     }
     bytes[i / 2] = byte;
@@ -84,7 +84,7 @@ export function base64ToBytes(base64: string): Uint8Array {
  * @param bytesPerLine - 1行あたりのバイト数（デフォルト: 16）
  * @returns フォーマットされた16進数文字列
  */
-export function bytesToHexFormatted(bytes: Uint8Array, bytesPerLine: number = 16): string {
+export function bytesToHexFormatted(bytes: Uint8Array, bytesPerLine = 16): string {
   const hex = bytesToHex(bytes);
   const lines: string[] = [];
   for (let i = 0; i < hex.length; i += bytesPerLine * 2) {
@@ -94,4 +94,3 @@ export function bytesToHexFormatted(bytes: Uint8Array, bytesPerLine: number = 16
   }
   return lines.join("\n");
 }
-

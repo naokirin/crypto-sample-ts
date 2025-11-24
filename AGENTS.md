@@ -72,8 +72,8 @@ crypto-sample-ts/
 ### 非対称鍵暗号
 - RSA
 - ECC (Elliptic Curve Cryptography)
-- IDベース暗号 (Identity-Based Encryption)
-- 属性ベース暗号 (Attribute-Based Encryption)
+- IDベース暗号 (Identity-Based Encryption) - 後回し（複雑なため）
+- 属性ベース暗号 (Attribute-Based Encryption) - 後回し（複雑なため）
 - その他
 
 ### ハッシュ関数
@@ -106,6 +106,69 @@ NIST標準選定された耐量子暗号:
   - CRYSTALS-Dilithium
   - FALCON
   - SPHINCS+
+
+## 非対称鍵暗号の実装方針
+
+### 実装対象
+
+まずはRSAとECCから実装を開始します。IBE/ABEは複雑なため、後回しにします。
+
+### RSA（Rivest-Shamir-Adleman）
+
+**使用ライブラリ**: `node-forge`
+
+**理由:**
+- ブラウザとNode.jsの両方で動作
+- RSAの鍵生成、暗号化/復号化、署名/検証をサポート
+- TypeScriptの型定義が利用可能
+- 実績があり、広く使用されている
+
+**実装する機能:**
+- RSA鍵ペアの生成（2048ビット、4096ビット）
+- RSA-OAEPによる暗号化/復号化
+- RSA署名と検証
+- PEM形式での鍵のエクスポート/インポート
+
+**実装ファイル:**
+- `src/asymmetric/rsa.ts`
+
+**テストファイル:**
+- `tests/asymmetric/rsa.test.ts`
+
+### ECC（Elliptic Curve Cryptography）
+
+**使用ライブラリ**: `@noble/curves`
+
+**理由:**
+- ブラウザとNode.jsの両方で動作
+- 既存の`@noble/ciphers`と一貫性がある
+- TypeScript対応で軽量かつセキュア
+- 多数の楕円曲線をサポート
+
+**実装する機能:**
+- 主要な楕円曲線のサポート:
+  - secp256k1（Bitcoinで使用）
+  - P-256、P-384、P-521（NIST推奨曲線）
+  - Ed25519、Ed448（Edwards曲線）
+- 秘密鍵/公開鍵の生成
+- ECDH（楕円曲線Diffie-Hellman鍵交換）
+- ECDSA署名と検証
+- EdDSA署名と検証
+
+**実装ファイル:**
+- `src/asymmetric/ecc.ts`
+
+**テストファイル:**
+- `tests/asymmetric/ecc.test.ts`
+
+### IBE/ABEについて
+
+IDベース暗号（IBE）と属性ベース暗号（ABE）は、ペアリングベースの暗号技術を使用するため、実装が複雑で計算量も多いです。現時点では実装を後回しにし、詳細な調査結果は`docs/asymmetric-libraries.md`に記載しています。
+
+将来的な実装方針:
+- WebAssembly（Wasm）を活用した実装を検討
+- 純粋なTypeScriptによる参考実装も調査
+- 詳細は`docs/asymmetric-libraries.md`を参照
 
 ## Webデモ
 
