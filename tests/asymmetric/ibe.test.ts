@@ -1,10 +1,10 @@
 /**
  * IBE（Identity-Based Encryption）のテスト
- * 
+ *
  * 現在は基本的な動作確認のみ
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { initIBE, testIBE } from "../../src/asymmetric/ibe.js";
 
 describe("IBE WebAssembly Module", () => {
@@ -22,4 +22,3 @@ describe("IBE WebAssembly Module", () => {
     expect(result).toBe(5); // 2 + 3 = 5
   });
 });
-

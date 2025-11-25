@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  hashSipHash,
-  generateSipHashKey,
-  SIPHASH_OUTPUT_SIZE,
   SIPHASH_KEY_SIZE,
+  SIPHASH_OUTPUT_SIZE,
+  generateSipHashKey,
+  hashSipHash,
 } from "../../src/hash/siphash.js";
 import { bytesToHex } from "../../src/utils/format.js";
 
@@ -11,8 +11,7 @@ describe("SipHash", () => {
   // Official test vector from the SipHash paper
   // Key: 000102030405060708090a0b0c0d0e0f
   const testKey = new Uint8Array([
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
-    0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
   ]);
 
   it("should hash empty string correctly (official test vector)", async () => {
@@ -78,9 +77,7 @@ describe("SipHash", () => {
     const input = new TextEncoder().encode("test");
     const invalidKey = new Uint8Array(8); // 8バイト（16バイトが必要）
 
-    await expect(hashSipHash(input, invalidKey)).rejects.toThrow(
-      "Invalid key length"
-    );
+    await expect(hashSipHash(input, invalidKey)).rejects.toThrow("Invalid key length");
   });
 
   it("should generate correct key size", () => {

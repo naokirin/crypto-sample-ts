@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashSHA512, SHA512_OUTPUT_SIZE } from "../../src/hash/sha512.js";
+import { SHA512_OUTPUT_SIZE, hashSHA512 } from "../../src/hash/sha512.js";
 import { bytesToHex } from "../../src/utils/format.js";
 
 describe("SHA-512", () => {

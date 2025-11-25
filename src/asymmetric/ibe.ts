@@ -1,6 +1,6 @@
 /**
  * IDベース暗号（IBE: Identity-Based Encryption）の実装
- * 
+ *
  * このモジュールは、WebAssemblyでコンパイルされたRust実装を使用します。
  * Boneh-Franklin IBEスキームを実装しています。
  */
@@ -8,8 +8,8 @@
 // WebAssemblyモジュールの型定義
 import type {
   IBEMasterKey,
-  IBEPublicParams,
   IBEPrivateKey,
+  IBEPublicParams,
   InitOutput,
 } from "../../wasm-src/ibe-wasm/pkg/ibe_wasm.js";
 
@@ -29,15 +29,11 @@ export async function initIBE(): Promise<void> {
 
   try {
     // WebAssemblyモジュールをロード
-    const wasmInit = (await import("../../wasm-src/ibe-wasm/pkg/ibe_wasm.js"))
-      .default;
+    const wasmInit = (await import("../../wasm-src/ibe-wasm/pkg/ibe_wasm.js")).default;
 
     // Wasmファイルのパスを明示的に指定（オブジェクト形式で渡す）
     wasmModule = await wasmInit({
-      module_or_path: new URL(
-        "../../wasm-src/ibe-wasm/pkg/ibe_wasm_bg.wasm",
-        import.meta.url
-      ).href,
+      module_or_path: new URL("../../wasm-src/ibe-wasm/pkg/ibe_wasm_bg.wasm", import.meta.url).href,
     });
     wasmModule.init();
     isInitialized = true;
@@ -48,7 +44,7 @@ export async function initIBE(): Promise<void> {
 
 /**
  * IBEのマスター鍵ペアを生成
- * 
+ *
  * @returns マスター鍵と公開パラメータ
  * @throws Error 初期化されていない場合、または実装が未完成の場合
  */
@@ -90,7 +86,7 @@ export async function generateIBEKeyPair(): Promise<{
 
 /**
  * アイデンティティから秘密鍵を抽出
- * 
+ *
  * @param masterKey マスター鍵
  * @param identity アイデンティティ（文字列）
  * @returns 秘密鍵
@@ -118,7 +114,7 @@ export async function extractIBEKey(
 
 /**
  * メッセージを暗号化
- * 
+ *
  * @param publicParams 公開パラメータ
  * @param identity アイデンティティ（文字列）
  * @param message 暗号化するメッセージ
@@ -148,7 +144,7 @@ export async function encryptIBE(
 
 /**
  * 暗号文を復号化
- * 
+ *
  * @param privateKey 秘密鍵
  * @param ciphertext 暗号文
  * @returns 復号化されたメッセージ
@@ -186,4 +182,3 @@ export async function testIBE(): Promise<number> {
 
   return wasmModule.add(2, 3);
 }
-

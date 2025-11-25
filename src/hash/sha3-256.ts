@@ -57,8 +57,7 @@ export const SHA3_256_INFO: HashAlgorithmInfo = {
     "SHA-3-256は、NIST標準の最新ハッシュ関数です。Keccakアルゴリズムをベースにしたスポンジ構造を持ち、SHA-2とは完全に異なる設計です。",
   keyed: false,
   securityLevel: "secure",
-  useCase:
-    "ファイル完全性検証、デジタル署名、鍵導出関数、SHA-2の代替",
+  useCase: "ファイル完全性検証、デジタル署名、鍵導出関数、SHA-2の代替",
 };
 
 /**

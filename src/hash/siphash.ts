@@ -44,8 +44,8 @@
  * この実装は、siphashライブラリを使用しています。
  */
 
-import * as SipHash from "siphash";
 import { randomBytes } from "@noble/ciphers/utils.js";
+import * as SipHash from "siphash";
 import type { HashAlgorithmInfo } from "./index.js";
 
 /**
@@ -71,8 +71,7 @@ export const SIPHASH_INFO: HashAlgorithmInfo = {
   keyed: true,
   keySize: SIPHASH_KEY_SIZE,
   securityLevel: "mac",
-  useCase:
-    "ハッシュテーブルのDoS対策、Bloomフィルタ、軽量メッセージ認証、データ構造保護",
+  useCase: "ハッシュテーブルのDoS対策、Bloomフィルタ、軽量メッセージ認証、データ構造保護",
 };
 
 /**
@@ -93,10 +92,7 @@ export const SIPHASH_INFO: HashAlgorithmInfo = {
  * console.log(bytesToHex(hash)); // "a129ca6149be45e5" (鍵に依存)
  * ```
  */
-export async function hashSipHash(
-  input: Uint8Array,
-  key: Uint8Array
-): Promise<Uint8Array> {
+export async function hashSipHash(input: Uint8Array, key: Uint8Array): Promise<Uint8Array> {
   // 鍵の長さを検証（128ビット = 16バイト）
   if (key.length !== SIPHASH_KEY_SIZE / 8) {
     throw new Error(

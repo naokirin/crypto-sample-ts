@@ -48,8 +48,7 @@ export const SHA512_INFO: HashAlgorithmInfo = {
     "SHA-512は、SHA-2ファミリーの一つで、512ビットのハッシュ値を生成します。SHA-256よりも長い出力により、より高いセキュリティマージンを提供します。",
   keyed: false,
   securityLevel: "secure",
-  useCase:
-    "ファイル完全性検証、デジタル署名（高セキュリティ）、鍵導出関数",
+  useCase: "ファイル完全性検証、デジタル署名（高セキュリティ）、鍵導出関数",
 };
 
 /**

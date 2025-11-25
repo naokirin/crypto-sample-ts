@@ -57,8 +57,7 @@ export const BLAKE3_INFO: HashAlgorithmInfo = {
     "BLAKE3は、BLAKE2の後継として設計された最新のハッシュ関数です。並列計算に最適化されており、マルチコアCPUで極めて高速に動作します。",
   keyed: false,
   securityLevel: "secure",
-  useCase:
-    "ファイル完全性検証（大容量）、デジタル署名、並列計算、コンテンツアドレス可能ストレージ",
+  useCase: "ファイル完全性検証（大容量）、デジタル署名、並列計算、コンテンツアドレス可能ストレージ",
 };
 
 /**

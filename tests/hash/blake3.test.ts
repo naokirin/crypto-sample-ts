@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashBLAKE3, BLAKE3_OUTPUT_SIZE } from "../../src/hash/blake3.js";
+import { BLAKE3_OUTPUT_SIZE, hashBLAKE3 } from "../../src/hash/blake3.js";
 import { bytesToHex } from "../../src/utils/format.js";
 
 describe("BLAKE3", () => {

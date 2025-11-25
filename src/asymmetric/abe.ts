@@ -1,6 +1,6 @@
 /**
  * 属性ベース暗号（ABE: Attribute-Based Encryption）の実装
- * 
+ *
  * このモジュールは、WebAssemblyでコンパイルされたRust実装を使用します。
  * CP-ABE (Ciphertext-Policy Attribute-Based Encryption) スキームを実装しています。
  */
@@ -8,8 +8,8 @@
 // WebAssemblyモジュールの型定義
 import type {
   ABEMasterKey,
-  ABEPublicParams,
   ABEPrivateKey,
+  ABEPublicParams,
   InitOutput,
 } from "../../wasm-src/abe-wasm/pkg/abe_wasm.js";
 
@@ -29,15 +29,11 @@ export async function initABE(): Promise<void> {
 
   try {
     // WebAssemblyモジュールをロード
-    const wasmInit = (await import("../../wasm-src/abe-wasm/pkg/abe_wasm.js"))
-      .default;
+    const wasmInit = (await import("../../wasm-src/abe-wasm/pkg/abe_wasm.js")).default;
 
     // Wasmファイルのパスを明示的に指定（オブジェクト形式で渡す）
     wasmModule = await wasmInit({
-      module_or_path: new URL(
-        "../../wasm-src/abe-wasm/pkg/abe_wasm_bg.wasm",
-        import.meta.url
-      ).href,
+      module_or_path: new URL("../../wasm-src/abe-wasm/pkg/abe_wasm_bg.wasm", import.meta.url).href,
     });
     wasmModule.init();
     isInitialized = true;
@@ -161,4 +157,3 @@ export async function testABE(): Promise<boolean> {
     return false;
   }
 }
-

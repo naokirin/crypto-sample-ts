@@ -1,4 +1,14 @@
 import {
+  type ABEMasterKey,
+  type ABEPrivateKey,
+  type ABEPublicParams,
+  decryptABE,
+  encryptABE,
+  extractABEKey,
+  generateABEKeyPair,
+  initABE,
+} from "../asymmetric/abe.js";
+import {
   type CurveType,
   type EccKeyPair,
   computeEcdh,
@@ -8,6 +18,16 @@ import {
   verifyEcdsa,
   verifyEddsa,
 } from "../asymmetric/ecc.js";
+import {
+  type IBEMasterKey,
+  type IBEPrivateKey,
+  type IBEPublicParams,
+  decryptIBE,
+  encryptIBE,
+  extractIBEKey,
+  generateIBEKeyPair,
+  initIBE,
+} from "../asymmetric/ibe.js";
 import {
   RSA_KEY_SIZE_2048,
   type RsaKeyPair,
@@ -34,26 +54,6 @@ import {
   generatePoly1305Key,
   verifyPoly1305MAC,
 } from "../symmetric/poly1305.js";
-import {
-  type IBEMasterKey,
-  type IBEPublicParams,
-  type IBEPrivateKey,
-  decryptIBE,
-  encryptIBE,
-  extractIBEKey,
-  generateIBEKeyPair,
-  initIBE,
-} from "../asymmetric/ibe.js";
-import {
-  type ABEMasterKey,
-  type ABEPublicParams,
-  type ABEPrivateKey,
-  decryptABE,
-  encryptABE,
-  extractABEKey,
-  generateABEKeyPair,
-  initABE,
-} from "../asymmetric/abe.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -792,17 +792,17 @@ function cryptoApp() {
         this.eccState.verified =
           curve === "ed25519" || curve === "ed448"
             ? verifyEddsa(
-              messageBytes,
-              this.eccState.signature,
-              this.eccState.keyPair.publicKey,
-              curve
-            )
+                messageBytes,
+                this.eccState.signature,
+                this.eccState.keyPair.publicKey,
+                curve
+              )
             : verifyEcdsa(
-              messageBytes,
-              this.eccState.signature,
-              this.eccState.keyPair.publicKey,
-              curve
-            );
+                messageBytes,
+                this.eccState.signature,
+                this.eccState.keyPair.publicKey,
+                curve
+              );
         this.eccState.error = "";
       } catch (error) {
         this.eccState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
@@ -897,10 +897,7 @@ function cryptoApp() {
       }
 
       try {
-        const decryptedBytes = await decryptIBE(
-          this.ibeState.privateKey,
-          this.ibeState.ciphertext
-        );
+        const decryptedBytes = await decryptIBE(this.ibeState.privateKey, this.ibeState.ciphertext);
         this.ibeState.decryptedBytes = decryptedBytes;
         this.ibeState.decrypted = this.bytesToString(decryptedBytes);
         this.ibeState.error = "";
@@ -980,9 +977,9 @@ function cryptoApp() {
 
       // カンマ区切りで分割し、各属性を追加
       const attributes = input
-        .split(',')
-        .map(attr => attr.trim())
-        .filter(attr => attr.length > 0);
+        .split(",")
+        .map((attr) => attr.trim())
+        .filter((attr) => attr.length > 0);
 
       // 重複をチェックして追加
       for (const attr of attributes) {
@@ -1033,10 +1030,7 @@ function cryptoApp() {
       }
 
       try {
-        const decryptedBytes = await decryptABE(
-          this.abeState.privateKey,
-          this.abeState.ciphertext
-        );
+        const decryptedBytes = await decryptABE(this.abeState.privateKey, this.abeState.ciphertext);
         this.abeState.decryptedBytes = decryptedBytes;
         this.abeState.decrypted = this.bytesToString(decryptedBytes);
         this.abeState.decryptionSucceeded = true;
@@ -1045,7 +1039,10 @@ function cryptoApp() {
         const errorMessage = error instanceof Error ? error.message : String(error);
 
         // 属性不一致のエラーを検出
-        if (errorMessage.includes("Attribute mismatch") || errorMessage.includes("属性が一致しません")) {
+        if (
+          errorMessage.includes("Attribute mismatch") ||
+          errorMessage.includes("属性が一致しません")
+        ) {
           this.abeState.decryptionSucceeded = false;
           this.abeState.error = "";
         } else {

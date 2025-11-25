@@ -21,10 +21,7 @@
 export type HashFunction = (input: Uint8Array) => Promise<Uint8Array>;
 
 // 鍵付きハッシュ関数（MAC）
-export type KeyedHashFunction = (
-  input: Uint8Array,
-  key: Uint8Array
-) => Promise<Uint8Array>;
+export type KeyedHashFunction = (input: Uint8Array, key: Uint8Array) => Promise<Uint8Array>;
 
 /**
  * ハッシュアルゴリズムの情報

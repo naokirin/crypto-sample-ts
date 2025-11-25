@@ -56,8 +56,7 @@ export const BLAKE2B_INFO: HashAlgorithmInfo = {
     "BLAKE2bは、SHA-3ファイナリストBLAKEの改良版で、SHA-3よりも高速かつ安全なハッシュ関数です。Argon2パスワードハッシュやZcash暗号通貨で使用されています。",
   keyed: false,
   securityLevel: "secure",
-  useCase:
-    "ファイル完全性検証、デジタル署名、パスワードハッシュ、暗号通貨",
+  useCase: "ファイル完全性検証、デジタル署名、パスワードハッシュ、暗号通貨",
 };
 
 /**

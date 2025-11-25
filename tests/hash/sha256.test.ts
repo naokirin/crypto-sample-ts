@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashSHA256, SHA256_OUTPUT_SIZE } from "../../src/hash/sha256.js";
+import { SHA256_OUTPUT_SIZE, hashSHA256 } from "../../src/hash/sha256.js";
 import { bytesToHex } from "../../src/utils/format.js";
 
 describe("SHA-256", () => {
