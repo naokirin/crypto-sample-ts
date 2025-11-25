@@ -77,11 +77,13 @@ crypto-sample-ts/
 - その他
 
 ### ハッシュ関数
-- SHA-256, SHA-512
-- SHA-3
-- BLAKE2
-- SipHash
-- その他
+- ✅ SHA-256 (NIST標準、Web Crypto API使用)
+- ✅ SHA-512 (NIST標準、Web Crypto API使用)
+- ✅ SHA-3-256 (NIST標準、Keccak/Sponge構造)
+- ✅ BLAKE2b (高速・512ビット出力)
+- ✅ BLAKE3 (並列処理可能・256ビット出力)
+- ✅ SipHash (鍵付きハッシュ関数/MAC、64ビット出力)
+- その他 (未実装)
 
 ### デジタル署名
 - RSA署名
@@ -169,6 +171,144 @@ IDベース暗号（IBE）と属性ベース暗号（ABE）は、ペアリング
 - WebAssembly（Wasm）を活用した実装を検討
 - 純粋なTypeScriptによる参考実装も調査
 - 詳細は`docs/asymmetric-libraries.md`を参照
+
+## ハッシュ関数の実装方針
+
+### 実装対象
+
+ブラウザ環境で動作する6種類のハッシュ関数を実装しました。
+
+### 実装したアルゴリズム
+
+#### SHA-256 / SHA-512
+
+**使用技術**: Web Crypto API（ブラウザネイティブ）
+
+**理由:**
+- ブラウザネイティブ実装で高速
+- 追加ライブラリ不要
+- セキュリティが保証されている
+- 非同期APIで一貫性がある
+
+**特徴:**
+- SHA-256: 256ビット（32バイト）出力、NIST標準
+- SHA-512: 512ビット（64バイト）出力、NIST標準
+- Merkle-Damgård構造
+
+**実装ファイル:**
+- `src/hash/sha256.ts`
+- `src/hash/sha512.ts`
+
+#### SHA-3-256
+
+**使用ライブラリ**: `@noble/hashes`
+
+**理由:**
+- Web Crypto APIはSHA-3未対応
+- 純粋なTypeScript実装で依存関係がない
+- セキュアで高速
+- ブラウザとNode.jsの両方で動作
+
+**特徴:**
+- 256ビット（32バイト）出力、NIST標準
+- Sponge構造（Keccak）
+- SHA-2の代替として標準化
+
+**実装ファイル:**
+- `src/hash/sha3-256.ts`
+
+#### BLAKE2b
+
+**使用ライブラリ**: `@noble/hashes`
+
+**特徴:**
+- 512ビット（64バイト）出力
+- SHA-2より高速で安全性も高い
+- HAIFA構造（ARXベース）
+- 暗号通貨などで広く採用
+
+**実装ファイル:**
+- `src/hash/blake2b.ts`
+
+#### BLAKE3
+
+**使用ライブラリ**: `@noble/hashes`
+
+**特徴:**
+- 256ビット（32バイト）出力
+- BLAKE2の後継、並列処理可能
+- 非常に高速
+- Merkle tree構造
+
+**実装ファイル:**
+- `src/hash/blake3.ts`
+
+#### SipHash
+
+**使用ライブラリ**: `siphash` (npmパッケージ)
+
+**理由:**
+- `@noble/hashes`にはSipHashが含まれていない
+- ブラウザ環境で動作する実装が必要
+
+**特徴:**
+- 64ビット（8バイト）出力
+- 鍵付きハッシュ関数（MAC）
+- 128ビット（16バイト）の鍵が必要
+- 短いメッセージに特化した高速なMAC
+- ARX構造
+- ハッシュテーブルのDoS攻撃対策として使用
+
+**実装ファイル:**
+- `src/hash/siphash.ts`
+
+**実装の注意点:**
+- `siphash`ライブラリはUint32Array形式の鍵を要求
+- Uint8Array ⇔ Uint32Array の変換処理を実装
+- リトルエンディアン形式で変換
+
+### 共通仕様
+
+**API設計:**
+- すべてのハッシュ関数は統一された非同期API
+- 入力: `Uint8Array`
+- 出力: `Promise<Uint8Array>`
+
+**型定義:**
+```typescript
+export type HashFunction = (input: Uint8Array) => Promise<Uint8Array>;
+export type KeyedHashFunction = (input: Uint8Array, key: Uint8Array) => Promise<Uint8Array>;
+```
+
+**テスト:**
+- 公式テストベクター（NIST、各アルゴリズムの公式仕様）を使用
+- 空文字列、短いメッセージ、長いメッセージなど多様な入力サイズでテスト
+- 決定性、衝突困難性の検証
+- SipHashは鍵依存性のテスト
+
+**テストファイル:**
+- `tests/hash/sha256.test.ts`
+- `tests/hash/sha512.test.ts`
+- `tests/hash/sha3-256.test.ts`
+- `tests/hash/blake2b.test.ts`
+- `tests/hash/blake3.test.ts`
+- `tests/hash/siphash.test.ts`
+
+### Web UI機能
+
+ハッシュ関数のWebデモには以下の機能を実装しています：
+
+1. **アルゴリズム選択**: 6種類のハッシュ関数から選択可能
+2. **比較モード**: 全アルゴリズムの性能を同時に比較
+3. **詳細表示**:
+   - 入力データのバイト単位表示（16進数）
+   - 処理時間の計測
+   - ハッシュ値の複数形式表示（16進数、Base64、バイト単位）
+4. **SipHash専用機能**: 128ビット鍵の生成機能
+5. **教育的な説明**:
+   - 各アルゴリズムの特徴
+   - ハッシュ関数の性質（一方向性、決定性、固定長出力、衝突困難性、雪崩効果）
+   - 構造の違い（Merkle-Damgård、Sponge、HAIFA、ARX）
 
 ## Webデモ
 
