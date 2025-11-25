@@ -32,7 +32,7 @@
  * この実装は、@noble/hashesライブラリを使用しています。
  */
 
-import { blake3 } from "@noble/hashes/blake3";
+import { blake3 } from "@noble/hashes/blake3.js";
 import type { HashAlgorithmInfo } from "./index.js";
 
 /**

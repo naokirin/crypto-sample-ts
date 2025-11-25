@@ -41,10 +41,10 @@
  * - 用途に応じて適切なハッシュ関数を選択してください
  *
  * ## 実装
- * この実装は、@noble/hashesライブラリを使用しています。
+ * この実装は、siphashライブラリを使用しています。
  */
 
-import { siphash24 } from "@noble/hashes/siphash";
+import * as SipHash from "siphash";
 import { randomBytes } from "@noble/ciphers/utils.js";
 import type { HashAlgorithmInfo } from "./index.js";
 
@@ -104,9 +104,24 @@ export async function hashSipHash(
     );
   }
 
-  // @noble/hashesのsiphash24は同期関数なので、Promiseでラップ
-  // 注意: siphash24の引数順序は (key, data)
-  return Promise.resolve(siphash24(key, input));
+  // siphashライブラリは鍵を4つの32ビット整数の配列として期待する
+  // 16バイト鍵を4つの32ビット整数に変換（リトルエンディアン）
+  const keyArray = new Uint32Array(4);
+  const dataView = new DataView(key.buffer, key.byteOffset, key.byteLength);
+  for (let i = 0; i < 4; i++) {
+    keyArray[i] = dataView.getUint32(i * 4, true); // true = little-endian
+  }
+
+  // SipHash計算（戻り値は {h: number, l: number} 形式）
+  const result = SipHash.hash(keyArray, input);
+
+  // 結果を8バイトのUint8Arrayに変換（リトルエンディアン）
+  const output = new Uint8Array(8);
+  const outputView = new DataView(output.buffer);
+  outputView.setUint32(0, result.l, true); // 下位32ビット
+  outputView.setUint32(4, result.h, true); // 上位32ビット
+
+  return Promise.resolve(output);
 }
 
 /**

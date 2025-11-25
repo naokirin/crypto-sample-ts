@@ -32,7 +32,7 @@
  * セキュリティ監査済みのJavaScript実装を使用しています。
  */
 
-import { sha3_256 } from "@noble/hashes/sha3";
+import { sha3_256 } from "@noble/hashes/sha3.js";
 import type { HashAlgorithmInfo } from "./index.js";
 
 /**

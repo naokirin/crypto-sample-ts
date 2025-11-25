@@ -31,7 +31,7 @@
  * この実装は、@noble/hashesライブラリを使用しています。
  */
 
-import { blake2b } from "@noble/hashes/blake2b";
+import { blake2b } from "@noble/hashes/blake2.js";
 import type { HashAlgorithmInfo } from "./index.js";
 
 /**
