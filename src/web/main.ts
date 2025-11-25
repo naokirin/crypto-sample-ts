@@ -54,6 +54,15 @@ import {
   generatePoly1305Key,
   verifyPoly1305MAC,
 } from "../symmetric/poly1305.js";
+import {
+  generateSipHashKey,
+  hashBLAKE2b,
+  hashBLAKE3,
+  hashSHA256,
+  hashSHA3_256,
+  hashSHA512,
+  hashSipHash,
+} from "../hash/index.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -212,6 +221,32 @@ function cryptoApp() {
       },
     },
 
+    // Hash状態
+    hashState: {
+      selectedAlgorithm: "sha256" as
+        | "sha256"
+        | "sha512"
+        | "sha3-256"
+        | "blake2b"
+        | "blake3"
+        | "siphash",
+      inputText: "",
+      inputBytes: null as Uint8Array | null,
+      hash: null as Uint8Array | null,
+      processingTime: 0,
+      error: "",
+      // SipHash用の鍵
+      siphashKey: null as Uint8Array | null,
+      showDetails: {
+        input: true,
+        processing: true,
+        output: true,
+      },
+      // 比較モード
+      comparisonMode: false,
+      comparisonResults: {} as Record<string, { hash: string; time: number }>,
+    },
+
     /**
      * 状態をリセット
      */
@@ -350,6 +385,22 @@ function cryptoApp() {
           encryption: true,
           decryption: true,
         },
+      };
+      this.hashState = {
+        selectedAlgorithm: "sha256",
+        inputText: "",
+        inputBytes: null,
+        hash: null,
+        processingTime: 0,
+        error: "",
+        siphashKey: null,
+        showDetails: {
+          input: true,
+          processing: true,
+          output: true,
+        },
+        comparisonMode: false,
+        comparisonResults: {},
       };
     },
 
@@ -1079,6 +1130,120 @@ function cryptoApp() {
         this.eccState.error = "";
       } catch (error) {
         this.eccState.error = `ECDH計算エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * SipHash用の鍵を生成
+     */
+    generateSipHashKey() {
+      try {
+        this.hashState.siphashKey = generateSipHashKey();
+        this.hashState.error = "";
+      } catch (error) {
+        this.hashState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * ハッシュ計算
+     */
+    async computeHash() {
+      if (!this.hashState.inputText) {
+        this.hashState.error = "入力テキストを入力してください";
+        return;
+      }
+
+      try {
+        const startTime = performance.now();
+        const inputBytes = new TextEncoder().encode(this.hashState.inputText);
+        this.hashState.inputBytes = inputBytes;
+
+        let hash: Uint8Array;
+
+        switch (this.hashState.selectedAlgorithm) {
+          case "sha256":
+            hash = await hashSHA256(inputBytes);
+            break;
+          case "sha512":
+            hash = await hashSHA512(inputBytes);
+            break;
+          case "sha3-256":
+            hash = await hashSHA3_256(inputBytes);
+            break;
+          case "blake2b":
+            hash = await hashBLAKE2b(inputBytes);
+            break;
+          case "blake3":
+            hash = await hashBLAKE3(inputBytes);
+            break;
+          case "siphash":
+            if (!this.hashState.siphashKey) {
+              this.hashState.error = "SipHashには鍵が必要です。鍵を生成してください。";
+              return;
+            }
+            hash = await hashSipHash(inputBytes, this.hashState.siphashKey);
+            break;
+          default:
+            this.hashState.error = "未知のアルゴリズムです";
+            return;
+        }
+
+        this.hashState.hash = hash;
+        this.hashState.processingTime = performance.now() - startTime;
+        this.hashState.error = "";
+      } catch (error) {
+        this.hashState.error = `ハッシュ計算エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * すべてのハッシュアルゴリズムで比較
+     */
+    async compareAllHashes() {
+      if (!this.hashState.inputText) {
+        this.hashState.error = "入力テキストを入力してください";
+        return;
+      }
+
+      try {
+        const inputBytes = new TextEncoder().encode(this.hashState.inputText);
+        this.hashState.inputBytes = inputBytes;
+        this.hashState.comparisonResults = {};
+
+        // 暗号学的ハッシュ関数
+        const algorithms = [
+          { name: "SHA-256", fn: hashSHA256 },
+          { name: "SHA-512", fn: hashSHA512 },
+          { name: "SHA-3-256", fn: hashSHA3_256 },
+          { name: "BLAKE2b", fn: hashBLAKE2b },
+          { name: "BLAKE3", fn: hashBLAKE3 },
+        ];
+
+        for (const algo of algorithms) {
+          const startTime = performance.now();
+          const hash = await algo.fn(inputBytes);
+          const time = performance.now() - startTime;
+          this.hashState.comparisonResults[algo.name] = {
+            hash: bytesToHex(hash),
+            time: time,
+          };
+        }
+
+        // SipHashは鍵が必要なので別処理
+        if (this.hashState.siphashKey) {
+          const startTime = performance.now();
+          const hash = await hashSipHash(inputBytes, this.hashState.siphashKey);
+          const time = performance.now() - startTime;
+          this.hashState.comparisonResults["SipHash-2-4"] = {
+            hash: bytesToHex(hash),
+            time: time,
+          };
+        }
+
+        this.hashState.error = "";
+      } catch (error) {
+        this.hashState.error = `比較エラー: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
   };
