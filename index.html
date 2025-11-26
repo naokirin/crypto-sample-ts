@@ -2996,7 +2996,8 @@
 
             <div class="param-group">
               <label for="hash-input-sha256">入力テキスト:</label>
-              <textarea id="hash-input-sha256" x-model="hashState.inputText" rows="4" placeholder="ハッシュ値を計算したいテキストを入力してください"
+              <textarea id="hash-input-sha256" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
                 @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
             </div>
 
@@ -3429,7 +3430,7 @@
               </div>
               <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
                 <strong>処理の説明:</strong><br />
-                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長（512ビット/64バイト）の出力（ハッシュ値）を生成します。<br />
                 2. 一方向性により、ハッシュ値から元のデータを復元することは計算量的に困難です。<br />
                 3. 入力の1ビットの変化でも、出力の約半分のビットが変化します（雪崩効果）。<br />
                 4. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。
@@ -3527,7 +3528,7 @@
 
               <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
                 <strong>処理の説明:</strong><br />
-                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長（512ビット/64バイト）の出力（ハッシュ値）を生成します。<br />
                 2. ハッシュ値は16進数やBase64形式で表示できます。<br />
                 3. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
                 4. ハッシュ値から元のデータを復元することは計算量的に困難です（一方向性）。
@@ -3542,7 +3543,7 @@
               <strong>暗号学的ハッシュ関数の要件:</strong><br />
               1. <strong>一方向性</strong>: ハッシュ値から元のデータを復元することが計算量的に困難<br />
               2. <strong>決定性</strong>: 同じ入力に対しては常に同じハッシュ値を生成<br />
-              3. <strong>固定長出力</strong>: 入力の長さに関わらず、常に固定長の出力を生成<br />
+              3. <strong>固定長出力</strong>: 入力の長さに関わらず、常に固定長（512ビット/64バイト）の出力を生成<br />
               4. <strong>衝突困難性</strong>: 異なる入力から同じハッシュ値を生成することが困難<br />
               5. <strong>雪崩効果</strong>: 入力の1ビットの変化が出力の約半分のビットを変化させる<br />
               <br />
@@ -4206,7 +4207,7 @@
 
               <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
                 <strong>処理の説明:</strong><br />
-                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長（512ビット/64バイト）の出力（ハッシュ値）を生成します。<br />
                 2. ハッシュ値は16進数やBase64形式で表示できます。<br />
                 3. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
                 4. ハッシュ値から元のデータを復元することは計算量的に困難です（一方向性）。
@@ -4218,6 +4219,13 @@
           <div class="section">
             <h3>ハッシュ関数の性質</h3>
             <div class="info">
+              <strong>暗号学的ハッシュ関数の要件:</strong><br />
+              1. <strong>一方向性</strong>: ハッシュ値から元のデータを復元することが計算量的に困難<br />
+              2. <strong>決定性</strong>: 同じ入力に対しては常に同じハッシュ値を生成<br />
+              3. <strong>固定長出力</strong>: 入力の長さに関わらず、常に固定長（512ビット/64バイト）の出力を生成<br />
+              4. <strong>衝突困難性</strong>: 異なる入力から同じハッシュ値を生成することが困難<br />
+              5. <strong>雪崩効果</strong>: 入力の1ビットの変化が出力の約半分のビットを変化させる<br />
+              <br />
               <strong>構造:</strong><br />
               • <strong>BLAKE2b</strong>: HAIFA構造 (ARXベース)
             </div>

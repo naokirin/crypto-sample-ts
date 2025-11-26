@@ -386,8 +386,28 @@ function cryptoApp() {
           decryption: true,
         },
       };
+      // selectedCryptoに基づいて適切なアルゴリズムを設定
+      let selectedAlgorithm = "sha256";
+      let comparisonMode = false;
+      
+      if (this.selectedCrypto === "hash-sha256") {
+        selectedAlgorithm = "sha256";
+      } else if (this.selectedCrypto === "hash-sha512") {
+        selectedAlgorithm = "sha512";
+      } else if (this.selectedCrypto === "hash-sha3-256") {
+        selectedAlgorithm = "sha3-256";
+      } else if (this.selectedCrypto === "hash-blake2b") {
+        selectedAlgorithm = "blake2b";
+      } else if (this.selectedCrypto === "hash-blake3") {
+        selectedAlgorithm = "blake3";
+      } else if (this.selectedCrypto === "hash-compare") {
+        comparisonMode = true;
+      } else if (this.selectedCrypto === "siphash") {
+        selectedAlgorithm = "siphash";
+      }
+      
       this.hashState = {
-        selectedAlgorithm: "sha256",
+        selectedAlgorithm: selectedAlgorithm,
         inputText: "",
         inputBytes: null,
         hash: null,
@@ -399,7 +419,7 @@ function cryptoApp() {
           processing: true,
           output: true,
         },
-        comparisonMode: false,
+        comparisonMode: comparisonMode,
         comparisonResults: {},
       };
     },
