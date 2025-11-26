@@ -334,6 +334,9 @@
           <option value="poly1305">Poly1305</option>
           <option value="siphash">SipHash (64-bit MAC)</option>
         </optgroup>
+        <optgroup label="耐量子暗号 (Post-Quantum Cryptography)">
+          <option value="kyber">CRYSTALS-Kyber (ML-KEM)</option>
+        </optgroup>
       </select>
     </div>
 
@@ -4442,6 +4445,425 @@
           </div>
 
           <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Post-Quantum Cryptography - Kyber -->
+    <template x-if="selectedCrypto === 'kyber'">
+      <div>
+        <div class="section">
+          <h2>CRYSTALS-Kyber (ML-KEM) の動作</h2>
+          <div class="info">
+            <strong>ML-KEM (Module-Lattice Key Encapsulation Mechanism)</strong><br />
+            CRYSTALS-Kyberは、NIST標準化された耐量子暗号アルゴリズムです。<br />
+            鍵カプセル化メカニズム（KEM）を使用して、安全な鍵交換を実現します。<br />
+            <span style="font-size: 0.9em; color: #e8f4f8; font-style: italic;">
+              ※ この実装はWebAssemblyでコンパイルされたRust実装を使用しています。
+            </span>
+          </div>
+
+          <!-- 初期化 -->
+          <div class="subsection">
+            <h3>1. 初期化</h3>
+            <button @click="initKyber()" :disabled="kyberState.initialized">WebAssemblyモジュールを初期化</button>
+            <div x-show="kyberState.initialized" class="output">✅ 初期化完了</div>
+            <div x-show="kyberState.showDetails.initialization && kyberState.initialized" class="detail-section">
+              <div class="data-box">
+                <div class="data-box-header">初期化完了</div>
+                <div class="data-box-content">
+                  ML-KEMが使用可能になりました。鍵ペア生成、カプセル化、デカプセル化の各操作を実行できます。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 鍵ペア生成 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="kyberState.showDetails.keyGeneration = !kyberState.showDetails.keyGeneration"
+                x-show="kyberState.publicKey">
+                <span x-show="!kyberState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="kyberState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+              2. 鍵ペアの生成
+            </h3>
+            <button @click="generateKyberKeyPair()" :disabled="!kyberState.initialized">鍵ペアを生成</button>
+            <div x-show="kyberState.publicKey" class="output">
+              <div><strong>公開鍵:</strong> <span x-text="formatBytes(kyberState.publicKey)"></span></div>
+              <div><strong>公開鍵サイズ:</strong> <span x-text="kyberState.publicKey?.length"></span> バイト</div>
+              <div style="margin-top: 10px;"><strong>秘密鍵:</strong> <span
+                  x-text="formatBytes(kyberState.privateKey)"></span></div>
+              <div><strong>秘密鍵サイズ:</strong> <span x-text="kyberState.privateKey?.length"></span> バイト</div>
+            </div>
+            <div x-show="kyberState.showDetails.keyGeneration && kyberState.publicKey" class="detail-section">
+              <h4>🔍 鍵ペア生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成器を初期化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    OsRng（オペレーティングシステムの乱数生成器）を使用<br />
+                    CSPRNG（暗号学的擬似乱数生成器）として機能
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. ML-KEMのkeygenアルゴリズムを実行</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ML-KEM.KeyGen()を実行<br />
+                    格子ベースの鍵生成（Module-LWE問題に基づく）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 公開鍵（EncapsKey）を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    格子の公開パラメータAとベクトルtを生成<br />
+                    サイズ: <span x-text="kyberState.publicKey?.length || 0"></span> バイト（1184バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 秘密鍵（DecapsKey）を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    秘密ベクトルsと公開鍵のハッシュhを保存<br />
+                    サイズ: <span x-text="kyberState.privateKey?.length || 0"></span> バイト（2400バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 鍵をバイト配列にシリアライズ</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(kyberState.publicKey)"></div>
+                  <div class="param-label">
+                    公開鍵: <span x-text="kyberState.publicKey?.length || 0"></span> バイト<br />
+                    秘密鍵: <span x-text="kyberState.privateKey?.length || 0"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="kyberState.publicKey" style="margin-top: 15px;">
+                <h4>公開鍵のバイト詳細（最初の32バイト）</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from((kyberState.publicKey || []).slice(0, 32))"
+                      :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 11px; color: #7f8c8d;">
+                  全 <span x-text="kyberState.publicKey?.length || 0"></span> バイト中、最初の32バイトを表示
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ML-KEM（Module-Lattice Key Encapsulation Mechanism）は、格子ベースの暗号化方式です。Module-LWE（Learning With
+                Errors）問題の困難性に基づいています。<br />
+                2. 鍵生成では、乱数生成器を使用して格子の公開パラメータAと秘密ベクトルsを生成します。<br />
+                3. 公開鍵（EncapsKey）は、格子の公開パラメータとベクトルt = As + e（eは誤差ベクトル）から構成されます。<br />
+                4. 秘密鍵（DecapsKey）は、秘密ベクトルsと公開鍵のハッシュhを保存します。これにより、デカプセル化時に正しい共有秘密を復元できます。<br />
+                5. ML-KEM-768（推奨レベル）では、公開鍵は1184バイト、秘密鍵は2400バイトです。
+              </div>
+            </div>
+          </div>
+
+          <!-- カプセル化 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="kyberState.showDetails.encapsulation = !kyberState.showDetails.encapsulation"
+                x-show="kyberState.ciphertext">
+                <span x-show="!kyberState.showDetails.encapsulation">詳細を表示</span>
+                <span x-show="kyberState.showDetails.encapsulation">詳細を隠す</span>
+              </button>
+              3. 鍵カプセル化（Encapsulation）
+            </h3>
+            <button @click="encapsulateKyber()" :disabled="!kyberState.publicKey">カプセル化を実行</button>
+            <div x-show="kyberState.ciphertext" class="output">
+              <div><strong>暗号文:</strong> <span x-text="formatBytes(kyberState.ciphertext)"></span></div>
+              <div><strong>暗号文サイズ:</strong> <span x-text="kyberState.ciphertext?.length"></span> バイト</div>
+              <div style="margin-top: 10px;"><strong>共有秘密:</strong> <span
+                  x-text="formatBytes(kyberState.sharedSecret)"></span></div>
+              <div><strong>共有秘密サイズ:</strong> <span x-text="kyberState.sharedSecret?.length"></span> バイト (32バイト)</div>
+            </div>
+            <div x-show="kyberState.showDetails.encapsulation && kyberState.ciphertext" class="detail-section">
+              <h4>🔍 カプセル化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. ランダムメッセージmを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    32バイトのランダムメッセージmを生成<br />
+                    CSPRNGを使用して暗号学的に安全な乱数を生成
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 公開鍵でメッセージを暗号化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ML-KEM.Encaps(ek, m)を実行<br />
+                    格子ベースの暗号化で暗号文cを生成
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 共有秘密kを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHA-3-512を使用してk = H(m, h)を計算<br />
+                    hは公開鍵のハッシュ値<br />
+                    出力: 32バイトの共有秘密
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 暗号文cを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号化されたメッセージとエラー情報を含む<br />
+                    サイズ: <span x-text="kyberState.ciphertext?.length || 0"></span> バイト（1088バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（暗号文と共有秘密）</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号文: <span x-text="formatBytesReadable(kyberState.ciphertext?.slice(0, 16) || [])"></span>...<br />
+                    共有秘密: <span x-text="formatBytesReadable(kyberState.sharedSecret || [])"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="kyberState.sharedSecret" style="margin-top: 15px;">
+                <h4>共有秘密のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(kyberState.sharedSecret || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div class="bytes-detail" x-show="kyberState.ciphertext" style="margin-top: 15px;">
+                <h4>暗号文のバイト詳細（最初の32バイト）</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from((kyberState.ciphertext || []).slice(0, 32))"
+                      :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 11px; color: #7f8c8d;">
+                  全 <span x-text="kyberState.ciphertext?.length || 0"></span> バイト中、最初の32バイトを表示
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. カプセル化（Encapsulation）は、公開鍵を使用して共有秘密を安全に生成し、暗号化するプロセスです。<br />
+                2. まず、32バイトのランダムメッセージmを生成します。このメッセージは、共有秘密の生成に使用されます。<br />
+                3. 公開鍵（EncapsKey）を使用して、メッセージmを格子ベースの暗号化で暗号化し、暗号文cを生成します。<br />
+                4. 共有秘密kは、SHA-3-512ハッシュ関数を使用してk = H(m, h)として計算されます。ここで、hは公開鍵のハッシュ値です。<br />
+                5. 暗号文cと共有秘密kのペアが出力されます。暗号文は1088バイト、共有秘密は32バイトです。<br />
+                6. 同じ公開鍵で複数回カプセル化を実行すると、異なる暗号文が生成されますが、デカプセル化で正しい共有秘密が復元されます。
+              </div>
+            </div>
+          </div>
+
+          <!-- デカプセル化 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="kyberState.showDetails.decapsulation = !kyberState.showDetails.decapsulation"
+                x-show="kyberState.decapsulatedSecret">
+                <span x-show="!kyberState.showDetails.decapsulation">詳細を表示</span>
+                <span x-show="kyberState.showDetails.decapsulation">詳細を隠す</span>
+              </button>
+              4. 鍵デカプセル化（Decapsulation）
+            </h3>
+            <button @click="decapsulateKyber()"
+              :disabled="!kyberState.ciphertext || !kyberState.privateKey">デカプセル化を実行</button>
+            <div x-show="kyberState.decapsulatedSecret" class="output">
+              <div><strong>復元された共有秘密:</strong> <span x-text="formatBytes(kyberState.decapsulatedSecret)"></span></div>
+              <div><strong>共有秘密サイズ:</strong> <span x-text="kyberState.decapsulatedSecret?.length"></span> バイト</div>
+              <div x-show="kyberState.sharedSecret && kyberState.decapsulatedSecret"
+                style="margin-top: 10px; padding: 10px; background: #d5e8f3; border-radius: 4px;">
+                <strong style="color: #2c3e50;">検証結果:</strong>
+                <span
+                  x-show="Array.from(kyberState.sharedSecret || []).every((b, i) => b === kyberState.decapsulatedSecret?.[i])"
+                  style="color: #27ae60;">
+                  ✅ 共有秘密が一致しました
+                </span>
+                <span
+                  x-show="!Array.from(kyberState.sharedSecret || []).every((b, i) => b === kyberState.decapsulatedSecret?.[i])"
+                  style="color: #e74c3c;">
+                  ❌ 共有秘密が一致しませんでした
+                </span>
+              </div>
+            </div>
+            <div x-show="kyberState.showDetails.decapsulation && kyberState.decapsulatedSecret" class="detail-section">
+              <h4>🔍 デカプセル化の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号文cと秘密鍵dkを入力</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    暗号文: <span x-text="kyberState.ciphertext?.length || 0"></span> バイト<br />
+                    秘密鍵: <span x-text="kyberState.privateKey?.length || 0"></span> バイト<br />
+                    公開鍵: <span x-text="kyberState.publicKey?.length || 0"></span> バイト（検証用）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. ML-KEM.Decapsを実行</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ML-KEM.Decaps(dk, ek, c)を実行<br />
+                    秘密鍵dkと公開鍵ekを使用して暗号文cを復号化
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. メッセージm'を復号化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    格子ベースの復号化でメッセージm'を取得<br />
+                    秘密ベクトルsを使用して暗号文からメッセージを復元
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 共有秘密k'を再計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    k' = H(m', h)を計算<br />
+                    SHA-3-512を使用して共有秘密を再生成<br />
+                    hは公開鍵のハッシュ値（秘密鍵に保存）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 出力（共有秘密k'）</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(kyberState.decapsulatedSecret || [])"></div>
+                  <div class="param-label">
+                    サイズ: <span x-text="kyberState.decapsulatedSecret?.length || 0"></span> バイト（32バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 検証結果</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span
+                      x-show="Array.from(kyberState.sharedSecret || []).every((b, i) => b === kyberState.decapsulatedSecret?.[i])"
+                      style="color: #27ae60; font-weight: bold;">
+                      ✓ k = k'（共有秘密が一致）
+                    </span>
+                    <span
+                      x-show="!Array.from(kyberState.sharedSecret || []).every((b, i) => b === kyberState.decapsulatedSecret?.[i])"
+                      style="color: #e74c3c; font-weight: bold;">
+                      ✗ k ≠ k'（共有秘密が不一致）
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="kyberState.decapsulatedSecret" style="margin-top: 15px;">
+                <h4>復元された共有秘密のバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(kyberState.decapsulatedSecret || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div x-show="kyberState.sharedSecret && kyberState.decapsulatedSecret" class="bytes-detail"
+                style="margin-top: 15px;">
+                <h4>共有秘密の比較</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>カプセル化時の値</th>
+                      <th>デカプセル化時の値</th>
+                      <th>一致</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(kyberState.sharedSecret || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td
+                          x-text="(kyberState.decapsulatedSecret?.[index] || 0).toString(16).padStart(2, '0').toUpperCase()">
+                        </td>
+                        <td>
+                          <span x-show="byte === kyberState.decapsulatedSecret?.[index]"
+                            style="color: #27ae60;">✓</span>
+                          <span x-show="byte !== kyberState.decapsulatedSecret?.[index]"
+                            style="color: #e74c3c;">✗</span>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. デカプセル化（Decapsulation）は、秘密鍵と暗号文を使用して共有秘密を復元するプロセスです。<br />
+                2. 秘密鍵（DecapsKey）には、秘密ベクトルsと公開鍵のハッシュ値hが保存されています。<br />
+                3. 暗号文cを秘密ベクトルsを使用して復号化し、元のメッセージm'を取得します。<br />
+                4. 共有秘密k'は、カプセル化時と同様にk' = H(m', h)として計算されます。ここで、hは秘密鍵に保存された公開鍵のハッシュ値です。<br />
+                5. 正しい秘密鍵でデカプセル化を実行すると、m' = mとなり、k' = kとなります。つまり、カプセル化時に生成された共有秘密と一致します。<br />
+                6. この共有秘密kは、その後の対称鍵暗号化（AESなど）の鍵として使用できます。ML-KEMは鍵交換プロトコルとして機能し、安全な鍵配送を実現します。
+              </div>
+            </div>
+          </div>
+
+          <div x-show="kyberState.error" style="color: #e74c3c; margin-top: 10px;" x-text="kyberState.error"></div>
         </div>
       </div>
     </template>

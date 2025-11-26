@@ -103,9 +103,9 @@ crypto-sample-ts/
 ### 耐量子暗号 (Post-Quantum Cryptography)
 NIST標準選定された耐量子暗号:
 - **鍵交換**
-  - CRYSTALS-Kyber
+  - ✅ CRYSTALS-Kyber (ML-KEM) - Rust + wasm-pack実装完了
 - **デジタル署名**
-  - CRYSTALS-Dilithium
+  - CRYSTALS-Dilithium (ML-DSA)
   - FALCON
   - SPHINCS+
 

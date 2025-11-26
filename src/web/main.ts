@@ -63,6 +63,12 @@ import {
   hashSHA512,
   hashSipHash,
 } from "../hash/index.js";
+import {
+  decapsulateKyber,
+  encapsulateKyber,
+  generateKyberKeyPair,
+  initKyber,
+} from "../post-quantum/kyber.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -247,6 +253,23 @@ function cryptoApp() {
       comparisonResults: {} as Record<string, { hash: string; time: number }>,
     },
 
+    // Kyber状態
+    kyberState: {
+      initialized: false,
+      publicKey: null as Uint8Array | null,
+      privateKey: null as Uint8Array | null,
+      ciphertext: null as Uint8Array | null,
+      sharedSecret: null as Uint8Array | null,
+      decapsulatedSecret: null as Uint8Array | null,
+      error: "",
+      showDetails: {
+        initialization: true,
+        keyGeneration: true,
+        encapsulation: true,
+        decapsulation: true,
+      },
+    },
+
     /**
      * 状態をリセット
      */
@@ -389,7 +412,7 @@ function cryptoApp() {
       // selectedCryptoに基づいて適切なアルゴリズムを設定
       let selectedAlgorithm = "sha256";
       let comparisonMode = false;
-      
+
       if (this.selectedCrypto === "hash-sha256") {
         selectedAlgorithm = "sha256";
       } else if (this.selectedCrypto === "hash-sha512") {
@@ -405,7 +428,7 @@ function cryptoApp() {
       } else if (this.selectedCrypto === "siphash") {
         selectedAlgorithm = "siphash";
       }
-      
+
       this.hashState = {
         selectedAlgorithm: selectedAlgorithm,
         inputText: "",
@@ -421,6 +444,21 @@ function cryptoApp() {
         },
         comparisonMode: comparisonMode,
         comparisonResults: {},
+      };
+      this.kyberState = {
+        initialized: false,
+        publicKey: null,
+        privateKey: null,
+        ciphertext: null,
+        sharedSecret: null,
+        decapsulatedSecret: null,
+        error: "",
+        showDetails: {
+          initialization: true,
+          keyGeneration: true,
+          encapsulation: true,
+          decapsulation: true,
+        },
       };
     },
 
@@ -863,17 +901,17 @@ function cryptoApp() {
         this.eccState.verified =
           curve === "ed25519" || curve === "ed448"
             ? verifyEddsa(
-                messageBytes,
-                this.eccState.signature,
-                this.eccState.keyPair.publicKey,
-                curve
-              )
+              messageBytes,
+              this.eccState.signature,
+              this.eccState.keyPair.publicKey,
+              curve
+            )
             : verifyEcdsa(
-                messageBytes,
-                this.eccState.signature,
-                this.eccState.keyPair.publicKey,
-                curve
-              );
+              messageBytes,
+              this.eccState.signature,
+              this.eccState.keyPair.publicKey,
+              curve
+            );
         this.eccState.error = "";
       } catch (error) {
         this.eccState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
@@ -1264,6 +1302,79 @@ function cryptoApp() {
         this.hashState.error = "";
       } catch (error) {
         this.hashState.error = `比較エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * Kyber初期化
+     */
+    async initKyber() {
+      try {
+        this.kyberState.error = "";
+        await initKyber();
+        this.kyberState.initialized = true;
+      } catch (error) {
+        this.kyberState.error = `初期化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.kyberState.initialized = false;
+      }
+    },
+
+    /**
+     * Kyber鍵ペア生成
+     */
+    async generateKyberKeyPair() {
+      if (!this.kyberState.initialized) {
+        await this.initKyber();
+      }
+
+      try {
+        this.kyberState.error = "";
+        const keyPair = await generateKyberKeyPair();
+        this.kyberState.publicKey = keyPair.publicKey;
+        this.kyberState.privateKey = keyPair.privateKey;
+      } catch (error) {
+        this.kyberState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * Kyberカプセル化
+     */
+    async encapsulateKyber() {
+      if (!this.kyberState.publicKey) {
+        this.kyberState.error = "まず鍵ペアを生成してください";
+        return;
+      }
+
+      try {
+        this.kyberState.error = "";
+        const result = await encapsulateKyber(this.kyberState.publicKey);
+        this.kyberState.ciphertext = result.ciphertext;
+        this.kyberState.sharedSecret = result.sharedSecret;
+      } catch (error) {
+        this.kyberState.error = `カプセル化エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * Kyberデカプセル化
+     */
+    async decapsulateKyber() {
+      if (!this.kyberState.ciphertext || !this.kyberState.privateKey || !this.kyberState.publicKey) {
+        this.kyberState.error = "カプセル化を実行してからデカプセル化してください";
+        return;
+      }
+
+      try {
+        this.kyberState.error = "";
+        const decapsulatedSecret = await decapsulateKyber(
+          this.kyberState.ciphertext,
+          this.kyberState.privateKey,
+          this.kyberState.publicKey
+        );
+        this.kyberState.decapsulatedSecret = decapsulatedSecret;
+      } catch (error) {
+        this.kyberState.error = `デカプセル化エラー: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
   };
