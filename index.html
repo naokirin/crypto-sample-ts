@@ -2995,8 +2995,8 @@
             </div>
 
             <div class="param-group">
-              <label for="hash-input">入力テキスト:</label>
-              <textarea id="hash-input" x-model="hashState.inputText" rows="4" placeholder="ハッシュ値を計算したいテキストを入力してください"
+              <label for="hash-input-sha256">入力テキスト:</label>
+              <textarea id="hash-input-sha256" x-model="hashState.inputText" rows="4" placeholder="ハッシュ値を計算したいテキストを入力してください"
                 @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
             </div>
 
@@ -3949,6 +3949,57 @@
                     </div>
                   </div>
                 </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>ハッシュ値 (Base64):</strong>
+                  <div class="output"
+                    style="margin-top: 5px; word-break: break-all; font-family: monospace; font-size: 0.9em;">
+                    <span x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span>
+                  </div>
+                </div>
+
+                <!-- Byte Table Display -->
+                <div class="bytes-detail" style="margin-top: 15px;">
+                  <h4>ハッシュ値のバイト詳細</h4>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>位置</th>
+                        <th>16進数</th>
+                        <th>10進数</th>
+                        <th>2進数（8ビット）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                        <tr>
+                          <td x-text="index"></td>
+                          <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                          <td x-text="byte"></td>
+                          <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>バイト単位表示:</strong>
+                  <div class="byte-display" style="margin-top: 5px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                      <span class="byte" x-text="byte.toString(16).padStart(2, '0')"
+                        :title="'Byte ' + index + ': 0x' + byte.toString(16).padStart(2, '0') + ' (' + byte + ')'"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                2. ハッシュ値は16進数やBase64形式で表示できます。<br />
+                3. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
+                4. ハッシュ値から元のデータを復元することは計算量的に困難です（一方向性）。
               </div>
             </div>
           </div>
@@ -4090,6 +4141,77 @@
               <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
               (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
             </div>
+
+            <div x-show="hashState.showDetails.output && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ値の詳細</h4>
+              <div>
+                <div class="data-flow">
+                  <div class="data-box">
+                    <div class="data-box-label">ハッシュ値 (16進数)</div>
+                    <div class="data-box-content"
+                      style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                      <span
+                        x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span>
+                    </div>
+                    <div class="param-label">
+                      長さ: <span x-text="(hashState.hash || []).length"></span> バイト
+                      (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>ハッシュ値 (Base64):</strong>
+                  <div class="output"
+                    style="margin-top: 5px; word-break: break-all; font-family: monospace; font-size: 0.9em;">
+                    <span x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span>
+                  </div>
+                </div>
+
+                <!-- Byte Table Display -->
+                <div class="bytes-detail" style="margin-top: 15px;">
+                  <h4>ハッシュ値のバイト詳細</h4>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>位置</th>
+                        <th>16進数</th>
+                        <th>10進数</th>
+                        <th>2進数（8ビット）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                        <tr>
+                          <td x-text="index"></td>
+                          <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                          <td x-text="byte"></td>
+                          <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>バイト単位表示:</strong>
+                  <div class="byte-display" style="margin-top: 5px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                      <span class="byte" x-text="byte.toString(16).padStart(2, '0')"
+                        :title="'Byte ' + index + ': 0x' + byte.toString(16).padStart(2, '0') + ' (' + byte + ')'"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                2. ハッシュ値は16進数やBase64形式で表示できます。<br />
+                3. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
+                4. ハッシュ値から元のデータを復元することは計算量的に困難です（一方向性）。
+              </div>
+            </div>
           </div>
 
           <!-- Hash Function Properties -->
@@ -4228,6 +4350,77 @@
                 x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span><br /><br />
               <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
               (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.output && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ値の詳細</h4>
+              <div>
+                <div class="data-flow">
+                  <div class="data-box">
+                    <div class="data-box-label">ハッシュ値 (16進数)</div>
+                    <div class="data-box-content"
+                      style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                      <span
+                        x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span>
+                    </div>
+                    <div class="param-label">
+                      長さ: <span x-text="(hashState.hash || []).length"></span> バイト
+                      (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>ハッシュ値 (Base64):</strong>
+                  <div class="output"
+                    style="margin-top: 5px; word-break: break-all; font-family: monospace; font-size: 0.9em;">
+                    <span x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span>
+                  </div>
+                </div>
+
+                <!-- Byte Table Display -->
+                <div class="bytes-detail" style="margin-top: 15px;">
+                  <h4>ハッシュ値のバイト詳細</h4>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>位置</th>
+                        <th>16進数</th>
+                        <th>10進数</th>
+                        <th>2進数（8ビット）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                        <tr>
+                          <td x-text="index"></td>
+                          <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                          <td x-text="byte"></td>
+                          <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>バイト単位表示:</strong>
+                  <div class="byte-display" style="margin-top: 5px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                      <span class="byte" x-text="byte.toString(16).padStart(2, '0')"
+                        :title="'Byte ' + index + ': 0x' + byte.toString(16).padStart(2, '0') + ' (' + byte + ')'"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                2. ハッシュ値は16進数やBase64形式で表示できます。<br />
+                3. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
+                4. ハッシュ値から元のデータを復元することは計算量的に困難です（一方向性）。
+              </div>
             </div>
           </div>
 
