@@ -75,6 +75,12 @@ import {
   signDilithium,
   verifyDilithium,
 } from "../post-quantum/dilithium.js";
+import {
+  generateFalconKeyPair,
+  initFalcon,
+  signFalcon,
+  verifyFalcon,
+} from "../post-quantum/falcon.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -278,6 +284,26 @@ function cryptoApp() {
 
     // Dilithium状態
     dilithiumState: {
+      initialized: false,
+      publicKey: null as Uint8Array | null,
+      privateKey: null as Uint8Array | null,
+      message: "",
+      messageBytes: null as Uint8Array | null,
+      signature: null as Uint8Array | null,
+      verificationMessage: "",
+      verificationMessageBytes: null as Uint8Array | null,
+      verified: null as boolean | null,
+      error: "",
+      showDetails: {
+        initialization: true,
+        keyGeneration: true,
+        signing: true,
+        verification: true,
+      },
+    },
+
+    // FALCON状態
+    falconState: {
       initialized: false,
       publicKey: null as Uint8Array | null,
       privateKey: null as Uint8Array | null,
@@ -1487,6 +1513,91 @@ function cryptoApp() {
         this.dilithiumState.verified = isValid;
       } catch (error) {
         this.dilithiumState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * FALCON初期化
+     */
+    async initFalcon() {
+      try {
+        this.falconState.error = "";
+        await initFalcon();
+        this.falconState.initialized = true;
+      } catch (error) {
+        this.falconState.error = `初期化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.falconState.initialized = false;
+      }
+    },
+
+    /**
+     * FALCON鍵ペア生成
+     */
+    async generateFalconKeyPair() {
+      if (!this.falconState.initialized) {
+        await this.initFalcon();
+      }
+      try {
+        this.falconState.error = "";
+        const keyPair = await generateFalconKeyPair();
+        this.falconState.publicKey = keyPair.publicKey;
+        this.falconState.privateKey = keyPair.privateKey;
+      } catch (error) {
+        this.falconState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * FALCON署名
+     */
+    async signFalcon() {
+      if (!this.falconState.privateKey) {
+        this.falconState.error = "まず鍵ペアを生成してください";
+        return;
+      }
+
+      if (!this.falconState.message) {
+        this.falconState.error = "メッセージを入力してください";
+        return;
+      }
+
+      try {
+        this.falconState.error = "";
+        const messageBytes = new TextEncoder().encode(this.falconState.message);
+        this.falconState.messageBytes = messageBytes;
+        const signature = await signFalcon(messageBytes, this.falconState.privateKey);
+        this.falconState.signature = signature;
+      } catch (error) {
+        this.falconState.error = `署名エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * FALCON署名検証
+     */
+    async verifyFalcon() {
+      if (!this.falconState.signature || !this.falconState.publicKey) {
+        this.falconState.error = "署名を生成してから検証してください";
+        return;
+      }
+
+      if (!this.falconState.verificationMessage) {
+        this.falconState.error = "検証するメッセージを入力してください";
+        return;
+      }
+
+      try {
+        this.falconState.error = "";
+        const messageBytes = new TextEncoder().encode(this.falconState.verificationMessage);
+        this.falconState.verificationMessageBytes = messageBytes;
+        const isValid = await verifyFalcon(
+          messageBytes,
+          this.falconState.signature,
+          this.falconState.publicKey
+        );
+        this.falconState.verified = isValid;
+      } catch (error) {
+        this.falconState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
   };

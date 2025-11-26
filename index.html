@@ -337,6 +337,7 @@
         <optgroup label="耐量子暗号 (Post-Quantum Cryptography)">
           <option value="kyber">CRYSTALS-Kyber (ML-KEM)</option>
           <option value="dilithium">CRYSTALS-Dilithium (ML-DSA)</option>
+          <option value="falcon">FALCON (FN-DSA)</option>
         </optgroup>
       </select>
     </div>
@@ -5257,6 +5258,255 @@
           </div>
 
           <div x-show="dilithiumState.error" style="color: #e74c3c; margin-top: 10px;" x-text="dilithiumState.error">
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Post-Quantum Cryptography - FALCON -->
+    <template x-if="selectedCrypto === 'falcon'">
+      <div>
+        <div class="section">
+          <h2>FALCON (FN-DSA) の動作</h2>
+          <div class="info">
+            <strong>FN-DSA (Falcon Digital Signature Algorithm)</strong><br />
+            FALCONは、NIST標準化された耐量子暗号アルゴリズムです。<br />
+            デジタル署名アルゴリズムとして、コンパクトな署名サイズを実現します。<br />
+            <span style="font-size: 0.9em; color: #e8f4f8; font-style: italic;">
+              ※ この実装はWebAssemblyでコンパイルされたRust実装（falcon-rust）を使用しています。FALCON-512を実装しています。
+            </span>
+          </div>
+
+          <!-- 初期化 -->
+          <div class="subsection">
+            <h3>1. 初期化</h3>
+            <button @click="initFalcon()" :disabled="falconState.initialized">WebAssemblyモジュールを初期化</button>
+            <div x-show="falconState.initialized" class="output">✅ 初期化完了</div>
+            <div x-show="falconState.showDetails.initialization && falconState.initialized" class="detail-section">
+              <div class="data-box">
+                <div class="data-box-header">初期化完了</div>
+                <div class="data-box-content">
+                  FALCONが使用可能になりました。鍵ペア生成、署名、検証の各操作を実行できます。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 鍵ペア生成 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="falconState.showDetails.keyGeneration = !falconState.showDetails.keyGeneration"
+                x-show="falconState.publicKey">
+                <span x-show="!falconState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="falconState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+              2. 鍵ペアの生成
+            </h3>
+            <button @click="generateFalconKeyPair()" :disabled="!falconState.initialized">鍵ペアを生成</button>
+            <div x-show="falconState.publicKey" class="output">
+              <div><strong>公開鍵:</strong> <span x-text="formatBytes(falconState.publicKey)"></span></div>
+              <div><strong>公開鍵サイズ:</strong> <span x-text="falconState.publicKey?.length"></span> バイト</div>
+              <div style="margin-top: 10px;"><strong>秘密鍵:</strong> <span
+                  x-text="formatBytes(falconState.privateKey)"></span></div>
+              <div><strong>秘密鍵サイズ:</strong> <span x-text="falconState.privateKey?.length"></span> バイト</div>
+            </div>
+            <div x-show="falconState.showDetails.keyGeneration && falconState.publicKey" class="detail-section">
+              <h4>🔍 鍵ペア生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成器を初期化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    OsRng（オペレーティングシステムの乱数生成器）を使用<br />
+                    CSPRNG（暗号学的擬似乱数生成器）として機能
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 32バイトのシードを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    乱数生成器から32バイトのシードを生成<br />
+                    このシードが鍵生成の基礎となる
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. FALCON-512のkeygenアルゴリズムを実行</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    FALCON.KeyGen()を実行<br />
+                    NTRU格子ベースの鍵生成（FFTを使用）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 公開鍵（PublicKey）を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    NTRU格子の公開パラメータhを生成<br />
+                    サイズ: <span x-text="falconState.publicKey?.length || 0"></span> バイト（約897バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 秘密鍵（SecretKey）を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    秘密多項式f、g、F、Gを保存<br />
+                    サイズ: <span x-text="falconState.privateKey?.length || 0"></span> バイト（約1281バイト）
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. FALCON（Fast-Fourier Lattice-based Compact Signatures over NTRU）は、NTRU格子ベースのデジタル署名方式です。<br />
+                2. 鍵生成では、乱数生成器を使用してNTRU格子の秘密多項式f、g、F、Gを生成します。<br />
+                3. 公開鍵は、NTRU格子の公開パラメータh = g * f^(-1) mod qから構成されます。FALCON-512では、公開鍵は約897バイトです。<br />
+                4. 秘密鍵は、秘密多項式f、g、F、Gを保存します。これにより、署名生成時に正しい署名を生成できます。FALCON-512では、秘密鍵は約1281バイトです。<br />
+                5. FALCON-512は、セキュリティレベル1（128ビット）に対応するパラメータセットです。
+              </div>
+            </div>
+          </div>
+
+          <!-- 署名 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle" @click="falconState.showDetails.signing = !falconState.showDetails.signing"
+                x-show="falconState.signature">
+                <span x-show="!falconState.showDetails.signing">詳細を表示</span>
+                <span x-show="falconState.showDetails.signing">詳細を隠す</span>
+              </button>
+              3. デジタル署名
+            </h3>
+            <label>署名するメッセージ:</label>
+            <textarea x-model="falconState.message" placeholder="署名するメッセージを入力"
+              @input="falconState.error = ''; falconState.signature = null;"></textarea>
+            <button @click="signFalcon()" :disabled="!falconState.privateKey || !falconState.message">署名</button>
+            <div x-show="falconState.signature" class="output">
+              <div><strong>署名:</strong> <span x-text="formatBytes(falconState.signature)"></span></div>
+              <div><strong>署名サイズ:</strong> <span x-text="falconState.signature?.length"></span> バイト（約666バイト）</div>
+            </div>
+            <div x-show="falconState.showDetails.signing && falconState.signature" class="detail-section">
+              <h4>🔍 署名の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="falconState.message || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(falconState.messageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="falconState.messageBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. メッセージのハッシュ値を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHAKE-256を使用してメッセージのハッシュ値を計算
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. FFTベースの署名生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    高速フーリエ変換（FFT）を使用して署名を生成<br />
+                    浮動小数点演算を使用
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 署名をバイト配列にシリアライズ</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(falconState.signature?.slice(0, 16) || [])">
+                  </div>
+                  <div class="param-label">
+                    署名サイズ: <span x-text="falconState.signature?.length || 0"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 署名するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. SHAKE-256を使用してメッセージのハッシュ値を計算します。<br />
+                3. 秘密鍵の秘密多項式f、g、F、Gを使用して、FFTベースの署名アルゴリズムを実行します。<br />
+                4. 署名は、NTRU格子の秘密多項式とメッセージのハッシュ値から生成されます。FALCON-512では、署名は約666バイトです。<br />
+                5. FALCONの署名は確率的署名であり、同じメッセージでも異なる署名が生成されます。
+              </div>
+            </div>
+          </div>
+
+          <!-- 署名検証 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="falconState.showDetails.verification = !falconState.showDetails.verification"
+                x-show="falconState.verified !== null">
+                <span x-show="!falconState.showDetails.verification">詳細を表示</span>
+                <span x-show="falconState.showDetails.verification">詳細を隠す</span>
+              </button>
+              4. 署名検証
+            </h3>
+            <label>検証するメッセージ:</label>
+            <textarea x-model="falconState.verificationMessage" placeholder="検証するメッセージを入力"
+              @input="falconState.error = ''; falconState.verified = null;"></textarea>
+            <button @click="verifyFalcon()"
+              :disabled="!falconState.signature || !falconState.publicKey || !falconState.verificationMessage">検証</button>
+            <div x-show="falconState.verified !== null" class="output">
+              <div x-show="falconState.verified" style="color: #27ae60; font-weight: bold;">
+                ✅ 署名は有効です
+              </div>
+              <div x-show="!falconState.verified" style="color: #e74c3c; font-weight: bold;">
+                ❌ 署名は無効です
+              </div>
+            </div>
+            <div x-show="falconState.showDetails.verification && falconState.verified !== null" class="detail-section">
+              <h4>🔍 署名検証の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 検証するメッセージをバイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(falconState.verificationMessageBytes)">
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. メッセージのハッシュ値を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHAKE-256を使用してメッセージのハッシュ値を計算
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 署名を復元</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    署名バイト配列から署名オブジェクトを復元
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. FFTベースの検証アルゴリズムを実行</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    公開鍵と署名を使用して検証を実行<br />
+                    FFTを使用して署名の有効性を確認
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 検証結果を返す</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-show="falconState.verified">✅ 署名は有効</span>
+                    <span x-show="!falconState.verified">❌ 署名は無効</span>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 検証するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. SHAKE-256を使用してメッセージのハッシュ値を計算します。<br />
+                3. 署名バイト配列から署名オブジェクトを復元します。<br />
+                4. 公開鍵と署名を使用して、FFTベースの検証アルゴリズムを実行します。<br />
+                5. 署名が有効な場合、検証は成功します。署名が無効な場合（異なるメッセージや公開鍵）、検証は失敗します。
+              </div>
+            </div>
+          </div>
+
+          <div x-show="falconState.error" style="color: #e74c3c; margin-top: 10px;" x-text="falconState.error">
           </div>
         </div>
       </div>
