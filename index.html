@@ -315,7 +315,6 @@
         <optgroup label="対称鍵暗号">
           <option value="aes">AES (Advanced Encryption Standard)</option>
           <option value="chacha20">ChaCha20</option>
-          <option value="poly1305">Poly1305 (MAC)</option>
         </optgroup>
         <optgroup label="非対称鍵暗号">
           <option value="rsa">RSA (Rivest-Shamir-Adleman)</option>
@@ -324,7 +323,16 @@
           <option value="abe">ABE (Attribute-Based Encryption)</option>
         </optgroup>
         <optgroup label="ハッシュ関数">
-          <option value="hash">Hash Functions</option>
+          <option value="hash-sha256">SHA-256 (256-bit)</option>
+          <option value="hash-sha512">SHA-512 (512-bit)</option>
+          <option value="hash-sha3-256">SHA-3-256 (256-bit)</option>
+          <option value="hash-blake2b">BLAKE2b (512-bit)</option>
+          <option value="hash-blake3">BLAKE3 (256-bit)</option>
+          <option value="hash-compare">全アルゴリズム比較計算</option>
+        </optgroup>
+        <optgroup label="MAC (Message Authentication Code)">
+          <option value="poly1305">Poly1305</option>
+          <option value="siphash">SipHash (64-bit MAC)</option>
         </optgroup>
       </select>
     </div>
@@ -1018,6 +1026,274 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- MAC - SipHash -->
+    <template x-if="selectedCrypto === 'siphash'">
+      <div>
+        <div class="section">
+          <h2>SipHash (MAC) の動作</h2>
+          <div class="info">
+            <strong>概要:</strong><br />
+            SipHashは、短いメッセージに特化した高速な鍵付きハッシュ関数（MAC）です。<br />
+            主な用途: ハッシュテーブルのDoS攻撃対策、メッセージ認証など<br />
+            <br />
+            <strong>特徴:</strong><br />
+            • 鍵付きハッシュ関数（MAC）<br />
+            • ARX構造<br />
+            • 64ビット（8バイト）の固定長出力<br />
+            • 短いメッセージに特化した高速なMAC
+          </div>
+
+          <!-- Input Section -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              入力データ
+              <button class="detail-toggle" @click="hashState.showDetails.input = !hashState.showDetails.input"
+                x-show="hashState.inputText">
+                <span x-show="!hashState.showDetails.input">詳細を表示</span>
+                <span x-show="hashState.showDetails.input">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div class="param-group">
+              <label for="hash-input-siphash">入力テキスト:</label>
+              <textarea id="hash-input-siphash" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
+                @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
+            </div>
+
+            <div x-show="hashState.inputText" class="output">
+              <strong>入力サイズ:</strong>
+              <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+              (<span x-text="hashState.inputText.length"></span> 文字)
+            </div>
+
+            <div x-show="hashState.showDetails.input && hashState.inputText" class="detail-section">
+              <h4>🔍 入力データの詳細</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. テキスト入力</div>
+                  <div class="data-box-content" style="max-height: 100px; overflow: auto;" x-text="hashState.inputText">
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. UTF-8エンコード</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    TextEncoderを使用してバイト配列に変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. バイト配列</div>
+                  <div class="data-box-content"
+                    style="font-family: monospace; word-break: break-all; max-height: 100px; overflow: auto;">
+                    <template
+                      x-for="(byte, index) in Array.from(new TextEncoder().encode(hashState.inputText)).slice(0, 64)"
+                      :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="new TextEncoder().encode(hashState.inputText).length > 64">...</span>
+                  </div>
+                  <div class="param-label">
+                    長さ: <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Key Generation -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              SipHash 鍵生成
+              <button class="detail-toggle"
+                @click="hashState.showDetails.keyGeneration = !hashState.showDetails.keyGeneration"
+                x-show="hashState.siphashKey">
+                <span x-show="!hashState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="hashState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+            </div>
+            <div class="info">
+              SipHashは鍵付きハッシュ関数 (MAC) のため、128ビット (16バイト) の鍵が必要です。
+            </div>
+            <button @click="generateSipHashKey()">鍵を生成</button>
+            <div x-show="hashState.siphashKey" class="output">
+              <strong>生成された鍵 (16進数):</strong><br />
+              <span style="font-family: monospace; word-break: break-all;">
+                <template x-for="(byte, index) in Array.from(hashState.siphashKey || [])" :key="index">
+                  <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                </template>
+              </span>
+            </div>
+            <div x-show="hashState.showDetails.keyGeneration && hashState.siphashKey" class="detail-section">
+              <h4>🔍 鍵生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    CSPRNG（暗号学的擬似乱数生成器）を使用
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 128ビット（16バイト）の鍵を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    各バイトは0x00～0xFFのランダムな値
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 生成された鍵</div>
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all;">
+                    <template x-for="(byte, index) in Array.from(hashState.siphashKey || [])" :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                  </div>
+                  <div class="param-label">
+                    長さ: 16 バイト（128 ビット）
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. SipHashは鍵付きハッシュ関数（MAC）であり、秘密鍵を使用してハッシュ値を計算します。<br />
+                2. 128ビット（16バイト）の鍵は、暗号学的に安全な乱数生成器（CSPRNG）を使用して生成されます。<br />
+                3. 同じ入力でも異なる鍵を使用すると、まったく異なるハッシュ値が生成されます。<br />
+                4. 鍵を知らない第三者は、正しいハッシュ値を計算できません（メッセージ認証）。
+              </div>
+            </div>
+          </div>
+
+          <!-- Hash Computation -->
+          <div class="step" x-init="hashState.selectedAlgorithm = 'siphash'; hashState.comparisonMode = false;">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              ハッシュ値の計算
+              <button class="detail-toggle"
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing" x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.processing">詳細を表示</span>
+                <span x-show="hashState.showDetails.processing">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="computeHash()" :disabled="!hashState.inputText || !hashState.siphashKey">
+              ハッシュ値を計算
+            </button>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>計算時間:</strong> <span x-text="hashState.processingTime.toFixed(3)"></span> ミリ秒<br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.processing && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    UTF-8エンコードされたバイト配列
+                  </div>
+                  <div class="param-label">
+                    <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. SipHashでハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SipHash (鍵付きハッシュ関数)<br />
+                    鍵 + メッセージ → ハッシュ値（64ビット）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ハッシュ値</div>
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                  </div>
+                  <div class="param-label">
+                    <span x-text="(hashState.hash || []).length"></span> バイト（固定長）
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. SipHashは鍵付きハッシュ関数（MAC）であり、秘密鍵を使用してハッシュ値を計算します。<br />
+                2. 一方向性により、ハッシュ値から元のデータを復元することは計算量的に困難です。<br />
+                3. 同じ入力でも異なる鍵を使用すると、まったく異なるハッシュ値が生成されます。<br />
+                4. 鍵を知らない第三者は、正しいハッシュ値を計算できません（メッセージ認証）。
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Section -->
+          <div x-show="hashState.hash" class="step">
+            <div class="step-title">
+              <span class="step-number">4</span>
+              ハッシュ値 (出力)
+              <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
+                x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.output">詳細を表示</span>
+                <span x-show="hashState.showDetails.output">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>ハッシュ値 (16進数):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span><br /><br />
+              <strong>ハッシュ値 (Base64):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span><br /><br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.output && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ値の詳細</h4>
+              <div>
+                <div class="data-flow">
+                  <div class="data-box">
+                    <div class="data-box-label">ハッシュ値 (16進数)</div>
+                    <div class="data-box-content"
+                      style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                      <span
+                        x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span>
+                    </div>
+                    <div class="param-label">
+                      長さ: <span x-text="(hashState.hash || []).length"></span> バイト
+                      (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MAC Properties -->
+          <div class="section">
+            <h3>MAC (Message Authentication Code) の性質</h3>
+            <div class="info">
+              <strong>鍵付きハッシュ関数の要件:</strong><br />
+              1. <strong>鍵依存性</strong>: 異なる鍵から異なるハッシュ値が生成される<br />
+              2. <strong>一方向性</strong>: ハッシュ値から元のデータを復元することが計算量的に困難<br />
+              3. <strong>固定長出力</strong>: 入力の長さに関わらず、常に固定長の出力を生成<br />
+              4. <strong>メッセージ認証</strong>: 鍵を知らない第三者は、正しいハッシュ値を計算できない<br />
+              <br />
+              <strong>構造:</strong><br />
+              • <strong>SipHash</strong>: ARX構造 (MAC用途に最適化)
+            </div>
+          </div>
+
+          <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
         </div>
       </div>
     </template>
@@ -2689,45 +2965,21 @@
       </div>
     </template>
 
-    <!-- Hash Functions -->
-    <template x-if="selectedCrypto === 'hash'">
+    <!-- Hash Functions - SHA-256 -->
+    <template x-if="selectedCrypto === 'hash-sha256'">
       <div>
         <div class="section">
-          <h2>ハッシュ関数の動作</h2>
+          <h2>SHA-256 の動作</h2>
           <div class="info">
             <strong>概要:</strong><br />
-            ハッシュ関数は、任意の長さのデータから固定長のハッシュ値を生成する一方向関数です。<br />
+            SHA-256は、任意の長さのデータから256ビット（32バイト）のハッシュ値を生成する一方向関数です。<br />
             主な用途: データの整合性検証、パスワード保存、デジタル署名、メッセージ認証など<br />
             <br />
-            <strong>アルゴリズム比較:</strong><br />
-            • <strong>SHA-256/512</strong>: NIST標準、広く使用される暗号学的ハッシュ関数<br />
-            • <strong>SHA-3-256</strong>: SHA-2の代替として標準化された最新のハッシュ関数<br />
-            • <strong>BLAKE2b</strong>: SHA-2より高速で安全性も高い、最大64バイト出力<br />
-            • <strong>BLAKE3</strong>: BLAKE2の後継、並列処理可能で非常に高速<br />
-            • <strong>SipHash</strong>: 短いメッセージに特化した高速なMAC (鍵付きハッシュ)
-          </div>
-
-          <!-- Algorithm Selection -->
-          <div class="param-group">
-            <label for="hash-algorithm">アルゴリズムを選択:</label>
-            <select id="hash-algorithm" x-model="hashState.selectedAlgorithm"
-              @change="hashState.error = ''; hashState.hash = null;">
-              <option value="sha256">SHA-256 (256-bit)</option>
-              <option value="sha512">SHA-512 (512-bit)</option>
-              <option value="sha3-256">SHA-3-256 (256-bit)</option>
-              <option value="blake2b">BLAKE2b (512-bit)</option>
-              <option value="blake3">BLAKE3 (256-bit)</option>
-              <option value="siphash">SipHash (64-bit MAC)</option>
-            </select>
-          </div>
-
-          <!-- Comparison Mode Toggle -->
-          <div class="param-group">
-            <label>
-              <input type="checkbox" x-model="hashState.comparisonMode"
-                @change="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};">
-              比較モード (全アルゴリズムを実行して性能を比較)
-            </label>
+            <strong>特徴:</strong><br />
+            • NIST標準の暗号学的ハッシュ関数<br />
+            • Merkle-Damgård構造<br />
+            • 256ビット（32バイト）の固定長出力<br />
+            • 広く使用されている実績のあるアルゴリズム
           </div>
 
           <!-- Input Section -->
@@ -2823,151 +3075,29 @@
             </div>
           </div>
 
-          <!-- SipHash Key Generation -->
-          <div x-show="hashState.selectedAlgorithm === 'siphash' && !hashState.comparisonMode" class="step">
+          <!-- Hash Computation -->
+          <div class="step" x-init="hashState.selectedAlgorithm = 'sha256'; hashState.comparisonMode = false;">
             <div class="step-title">
               <span class="step-number">2</span>
-              SipHash 鍵生成
+              ハッシュ値の計算
               <button class="detail-toggle"
-                @click="hashState.showDetails.keyGeneration = !hashState.showDetails.keyGeneration"
-                x-show="hashState.siphashKey">
-                <span x-show="!hashState.showDetails.keyGeneration">詳細を表示</span>
-                <span x-show="hashState.showDetails.keyGeneration">詳細を隠す</span>
-              </button>
-            </div>
-            <div class="info">
-              SipHashは鍵付きハッシュ関数 (MAC) のため、128ビット (16バイト) の鍵が必要です。
-            </div>
-            <button @click="generateSipHashKey()">鍵を生成</button>
-            <div x-show="hashState.siphashKey" class="output">
-              <strong>生成された鍵 (16進数):</strong><br />
-              <span style="font-family: monospace; word-break: break-all;">
-                <template x-for="(byte, index) in Array.from(hashState.siphashKey || [])" :key="index">
-                  <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
-                </template>
-              </span>
-            </div>
-            <div x-show="hashState.showDetails.keyGeneration && hashState.siphashKey" class="detail-section">
-              <h4>🔍 鍵生成の内部処理</h4>
-              <div class="data-flow">
-                <div class="data-box">
-                  <div class="data-box-label">1. 暗号学的に安全な乱数生成</div>
-                  <div class="data-box-content" style="font-size: 10px;">
-                    CSPRNG（暗号学的擬似乱数生成器）を使用
-                  </div>
-                </div>
-                <div class="arrow">→</div>
-                <div class="data-box">
-                  <div class="data-box-label">2. 128ビット（16バイト）の鍵を生成</div>
-                  <div class="data-box-content" style="font-size: 10px;">
-                    各バイトは0x00～0xFFのランダムな値
-                  </div>
-                </div>
-                <div class="arrow">→</div>
-                <div class="data-box">
-                  <div class="data-box-label">3. 生成された鍵</div>
-                  <div class="data-box-content" style="font-family: monospace; word-break: break-all;">
-                    <template x-for="(byte, index) in Array.from(hashState.siphashKey || [])" :key="index">
-                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
-                    </template>
-                  </div>
-                  <div class="param-label">
-                    長さ: 16 バイト（128 ビット）
-                  </div>
-                </div>
-              </div>
-              <div class="bytes-detail">
-                <h4>鍵のバイト詳細</h4>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>位置</th>
-                      <th>16進数</th>
-                      <th>10進数</th>
-                      <th>2進数（8ビット）</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template x-for="(byte, index) in Array.from(hashState.siphashKey || [])" :key="index">
-                      <tr>
-                        <td x-text="index"></td>
-                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
-                        <td x-text="byte"></td>
-                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
-              </div>
-              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
-                <strong>処理の説明:</strong><br />
-                1. SipHashは鍵付きハッシュ関数（MAC）であり、秘密鍵を使用してハッシュ値を計算します。<br />
-                2. 128ビット（16バイト）の鍵は、暗号学的に安全な乱数生成器（CSPRNG）を使用して生成されます。<br />
-                3. 同じ入力でも異なる鍵を使用すると、まったく異なるハッシュ値が生成されます。<br />
-                4. 鍵を知らない第三者は、正しいハッシュ値を計算できません（メッセージ認証）。
-              </div>
-            </div>
-          </div>
-
-          <!-- Compute Hash Button -->
-          <div class="step">
-            <div class="step-title">
-              <span class="step-number"
-                x-text="hashState.selectedAlgorithm === 'siphash' && !hashState.comparisonMode ? '3' : '2'"></span>
-              <span x-text="hashState.comparisonMode ? '全アルゴリズムで計算' : 'ハッシュ値の計算'"></span>
-              <button class="detail-toggle"
-                @click="hashState.showDetails.processing = !hashState.showDetails.processing"
-                x-show="hashState.hash || Object.keys(hashState.comparisonResults).length > 0">
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing" x-show="hashState.hash">
                 <span x-show="!hashState.showDetails.processing">詳細を表示</span>
                 <span x-show="hashState.showDetails.processing">詳細を隠す</span>
               </button>
             </div>
-            <button @click="hashState.comparisonMode ? compareAllHashes() : computeHash()"
-              :disabled="!hashState.inputText || (hashState.selectedAlgorithm === 'siphash' && !hashState.siphashKey && !hashState.comparisonMode)">
-              <span x-text="hashState.comparisonMode ? '全アルゴリズムで計算' : 'ハッシュ値を計算'"></span>
+            <button @click="computeHash()" :disabled="!hashState.inputText">
+              ハッシュ値を計算
             </button>
 
             <!-- Single Algorithm Result -->
-            <div x-show="!hashState.comparisonMode && hashState.hash" class="output">
+            <div x-show="hashState.hash" class="output">
               <strong>計算時間:</strong> <span x-text="hashState.processingTime.toFixed(3)"></span> ミリ秒<br />
               <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
               (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
             </div>
 
-            <!-- Comparison Results Table -->
-            <div x-show="hashState.comparisonMode && Object.keys(hashState.comparisonResults).length > 0"
-              class="output">
-              <strong>性能比較結果:</strong>
-              <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                <thead>
-                  <tr style="background-color: #f0f0f0;">
-                    <th style="padding: 8px; border: 1px solid #ddd; text-align: left; color: #333; font-weight: bold;">
-                      アルゴリズム</th>
-                    <th
-                      style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #333; font-weight: bold;">
-                      処理時間 (ms)</th>
-                    <th
-                      style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #333; font-weight: bold;">
-                      出力サイズ (bit)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="(result, algorithm) in hashState.comparisonResults" :key="algorithm">
-                    <tr>
-                      <td style="padding: 8px; border: 1px solid #ddd;" x-text="algorithm.toUpperCase()"></td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;"
-                        x-text="result.time.toFixed(3)"></td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;"
-                        x-text="result.hash.length / 2 * 8"></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-
-            <div
-              x-show="hashState.showDetails.processing && (hashState.hash || Object.keys(hashState.comparisonResults).length > 0)"
-              class="detail-section">
+            <div x-show="hashState.showDetails.processing && hashState.hash" class="detail-section">
               <h4>🔍 ハッシュ計算の内部処理</h4>
               <div class="data-flow">
                 <div class="data-box">
@@ -2981,27 +3111,23 @@
                 </div>
                 <div class="arrow">→</div>
                 <div class="data-box">
-                  <div class="data-box-label">2. ハッシュ関数適用</div>
+                  <div class="data-box-label">2. SHA-256でハッシュ化</div>
                   <div class="data-box-content" style="font-size: 10px;">
-                    <span x-text="hashState.selectedAlgorithm.toUpperCase()"></span><br />
+                    SHA-256<br />
                     一方向関数による変換
                   </div>
                 </div>
                 <div class="arrow">→</div>
                 <div class="data-box">
                   <div class="data-box-label">3. ハッシュ値</div>
-                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;"
-                    x-show="!hashState.comparisonMode">
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;">
                     <template x-for="(byte, index) in Array.from(hashState.hash || []).slice(0, 16)" :key="index">
                       <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
                     </template>
                     <span x-show="(hashState.hash || []).length > 16">...</span>
                   </div>
-                  <div class="param-label" x-show="!hashState.comparisonMode">
+                  <div class="param-label">
                     <span x-text="(hashState.hash || []).length"></span> バイト（固定長）
-                  </div>
-                  <div class="data-box-content" style="font-size: 10px;" x-show="hashState.comparisonMode">
-                    全アルゴリズムで計算完了
                   </div>
                 </div>
               </div>
@@ -3010,27 +3136,25 @@
                 1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
                 2. 一方向性により、ハッシュ値から元のデータを復元することは計算量的に困難です。<br />
                 3. 入力の1ビットの変化でも、出力の約半分のビットが変化します（雪崩効果）。<br />
-                4. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
-                <span x-show="hashState.comparisonMode">5. 比較モードでは、全アルゴリズムの処理時間と出力サイズを比較できます。</span>
+                4. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。
               </div>
             </div>
           </div>
 
           <!-- Output Section -->
-          <div x-show="hashState.hash || Object.keys(hashState.comparisonResults).length > 0" class="step">
+          <div x-show="hashState.hash" class="step">
             <div class="step-title">
-              <span class="step-number"
-                x-text="hashState.selectedAlgorithm === 'siphash' && !hashState.comparisonMode ? '4' : '3'"></span>
+              <span class="step-number">3</span>
               ハッシュ値 (出力)
               <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
-                x-show="hashState.hash || Object.keys(hashState.comparisonResults).length > 0">
+                x-show="hashState.hash">
                 <span x-show="!hashState.showDetails.output">詳細を表示</span>
                 <span x-show="hashState.showDetails.output">詳細を隠す</span>
               </button>
             </div>
 
             <!-- Single Algorithm Output -->
-            <div x-show="!hashState.comparisonMode && hashState.hash" class="output">
+            <div x-show="hashState.hash" class="output">
               <strong>ハッシュ値 (16進数):</strong><br />
               <span style="word-break: break-all; font-family: monospace;"
                 x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span><br /><br />
@@ -3041,28 +3165,11 @@
               (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
             </div>
 
-            <!-- Comparison Mode Output -->
-            <div x-show="hashState.comparisonMode && Object.keys(hashState.comparisonResults).length > 0"
-              class="output">
-              <strong>性能比較結果:</strong>
-              <template x-for="(result, algorithm) in hashState.comparisonResults" :key="algorithm">
-                <div style="margin-top: 10px;">
-                  <strong x-text="algorithm.toUpperCase()"></strong>
-                  ハッシュ値 (16進数): <span style="word-break: break-all; font-family: monospace; font-size: 0.9em;"
-                    x-text="result.hash"></span>
-                  処理時間: <span x-text="result.time.toFixed(3)"></span> ms |
-                  出力サイズ: <span x-text="result.hash.length / 2"></span> バイト
-                </div>
-              </template>
-            </div>
-
-            <div
-              x-show="hashState.showDetails.output && (!hashState.comparisonMode && hashState.hash || hashState.comparisonMode && Object.keys(hashState.comparisonResults).length > 0)"
-              class="detail-section">
+            <div x-show="hashState.showDetails.output && hashState.hash" class="detail-section">
               <h4>🔍 ハッシュ値の詳細</h4>
 
               <!-- Single Algorithm Details -->
-              <div x-show="!hashState.comparisonMode && hashState.hash">
+              <div>
                 <div class="data-flow">
                   <div class="data-box">
                     <div class="data-box-label">ハッシュ値 (16進数)</div>
@@ -3122,29 +3229,300 @@
                 </div>
               </div>
 
-              <!-- Comparison Mode Details -->
-              <div x-show="hashState.comparisonMode && Object.keys(hashState.comparisonResults).length > 0">
-                <template x-for="(result, algorithm) in hashState.comparisonResults" :key="algorithm">
-                  <div style="margin-top: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                    <h4 x-text="algorithm.toUpperCase()"></h4>
-                    <div class="data-flow">
-                      <div class="data-box">
-                        <div class="data-box-label">ハッシュ値 (16進数)</div>
-                        <div class="data-box-content"
-                          style="font-family: monospace; word-break: break-all; font-size: 10px;">
-                          <span x-text="result.hash"></span>
-                        </div>
-                        <div class="param-label">
-                          長さ: <span x-text="result.hash.length / 2"></span> バイト
-                          (<span x-text="result.hash.length / 2 * 8"></span> ビット)
-                        </div>
-                      </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                2. ハッシュ値は16進数やBase64形式で表示できます。<br />
+                3. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。<br />
+                4. ハッシュ値から元のデータを復元することは計算量的に困難です（一方向性）。
+              </div>
+            </div>
+          </div>
+
+          <!-- Hash Function Properties -->
+          <div class="section">
+            <h3>ハッシュ関数の性質</h3>
+            <div class="info">
+              <strong>暗号学的ハッシュ関数の要件:</strong><br />
+              1. <strong>一方向性</strong>: ハッシュ値から元のデータを復元することが計算量的に困難<br />
+              2. <strong>決定性</strong>: 同じ入力に対しては常に同じハッシュ値を生成<br />
+              3. <strong>固定長出力</strong>: 入力の長さに関わらず、常に固定長の出力を生成<br />
+              4. <strong>衝突困難性</strong>: 異なる入力から同じハッシュ値を生成することが困難<br />
+              5. <strong>雪崩効果</strong>: 入力の1ビットの変化が出力の約半分のビットを変化させる<br />
+              <br />
+              <strong>構造:</strong><br />
+              • <strong>SHA-256</strong>: Merkle-Damgård構造
+            </div>
+          </div>
+
+          <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Hash Functions - SHA-512 -->
+    <template x-if="selectedCrypto === 'hash-sha512'">
+      <div>
+        <div class="section">
+          <h2>SHA-512 の動作</h2>
+          <div class="info">
+            <strong>概要:</strong><br />
+            SHA-512は、任意の長さのデータから512ビット（64バイト）のハッシュ値を生成する一方向関数です。<br />
+            主な用途: データの整合性検証、パスワード保存、デジタル署名、メッセージ認証など<br />
+            <br />
+            <strong>特徴:</strong><br />
+            • NIST標準の暗号学的ハッシュ関数<br />
+            • Merkle-Damgård構造<br />
+            • 512ビット（64バイト）の固定長出力<br />
+            • 広く使用されている実績のあるアルゴリズム
+          </div>
+
+          <!-- Input Section -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              入力データ
+              <button class="detail-toggle" @click="hashState.showDetails.input = !hashState.showDetails.input"
+                x-show="hashState.inputText">
+                <span x-show="!hashState.showDetails.input">詳細を表示</span>
+                <span x-show="hashState.showDetails.input">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div class="param-group">
+              <label for="hash-input-sha512">入力テキスト:</label>
+              <textarea id="hash-input-sha512" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
+                @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
+            </div>
+
+            <div x-show="hashState.inputText" class="output">
+              <strong>入力サイズ:</strong>
+              <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+              (<span x-text="hashState.inputText.length"></span> 文字)
+            </div>
+
+            <div x-show="hashState.showDetails.input && hashState.inputText" class="detail-section">
+              <h4>🔍 入力データの詳細</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. テキスト入力</div>
+                  <div class="data-box-content" style="max-height: 100px; overflow: auto;" x-text="hashState.inputText">
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. UTF-8エンコード</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    TextEncoderを使用してバイト配列に変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. バイト配列</div>
+                  <div class="data-box-content"
+                    style="font-family: monospace; word-break: break-all; max-height: 100px; overflow: auto;">
+                    <template
+                      x-for="(byte, index) in Array.from(new TextEncoder().encode(hashState.inputText)).slice(0, 64)"
+                      :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="new TextEncoder().encode(hashState.inputText).length > 64">...</span>
+                  </div>
+                  <div class="param-label">
+                    長さ: <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="new TextEncoder().encode(hashState.inputText).length <= 32">
+                <h4>入力データのバイト詳細 (最初の32バイト)</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                      <th>ASCII</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template
+                      x-for="(byte, index) in Array.from(new TextEncoder().encode(hashState.inputText)).slice(0, 32)"
+                      :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                        <td x-text="byte >= 32 && byte < 127 ? String.fromCharCode(byte) : '·'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 入力されたテキストはUTF-8エンコーディングでバイト配列に変換されます。<br />
+                2. 各文字は1〜4バイトで表現されます（ASCIIは1バイト、日本語などは3バイト）。<br />
+                3. このバイト配列がハッシュ関数への入力となります。<br />
+                4. ハッシュ関数は任意の長さの入力を受け付け、固定長の出力を生成します。
+              </div>
+            </div>
+          </div>
+
+          <!-- Hash Computation -->
+          <div class="step" x-init="hashState.selectedAlgorithm = 'sha512'; hashState.comparisonMode = false;">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              ハッシュ値の計算
+              <button class="detail-toggle"
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing" x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.processing">詳細を表示</span>
+                <span x-show="hashState.showDetails.processing">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="computeHash()" :disabled="!hashState.inputText">
+              ハッシュ値を計算
+            </button>
+
+            <!-- Single Algorithm Result -->
+            <div x-show="hashState.hash" class="output">
+              <strong>計算時間:</strong> <span x-text="hashState.processingTime.toFixed(3)"></span> ミリ秒<br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.processing && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    UTF-8エンコードされたバイト配列
+                  </div>
+                  <div class="param-label">
+                    <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. SHA-512でハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHA-512<br />
+                    一方向関数による変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ハッシュ値</div>
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || []).slice(0, 16)" :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="(hashState.hash || []).length > 16">...</span>
+                  </div>
+                  <div class="param-label">
+                    <span x-text="(hashState.hash || []).length"></span> バイト（固定長）
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ハッシュ関数は、任意の長さの入力データから固定長の出力（ハッシュ値）を生成します。<br />
+                2. 一方向性により、ハッシュ値から元のデータを復元することは計算量的に困難です。<br />
+                3. 入力の1ビットの変化でも、出力の約半分のビットが変化します（雪崩効果）。<br />
+                4. 同じ入力に対しては、常に同じハッシュ値が生成されます（決定性）。
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Section -->
+          <div x-show="hashState.hash" class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              ハッシュ値 (出力)
+              <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
+                x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.output">詳細を表示</span>
+                <span x-show="hashState.showDetails.output">詳細を隠す</span>
+              </button>
+            </div>
+
+            <!-- Single Algorithm Output -->
+            <div x-show="hashState.hash" class="output">
+              <strong>ハッシュ値 (16進数):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span><br /><br />
+              <strong>ハッシュ値 (Base64):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span><br /><br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.output && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ値の詳細</h4>
+
+              <!-- Single Algorithm Details -->
+              <div>
+                <div class="data-flow">
+                  <div class="data-box">
+                    <div class="data-box-label">ハッシュ値 (16進数)</div>
+                    <div class="data-box-content"
+                      style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                      <span
+                        x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span>
                     </div>
-                    <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                      処理時間: <span x-text="result.time.toFixed(3)"></span> ms
+                    <div class="param-label">
+                      長さ: <span x-text="(hashState.hash || []).length"></span> バイト
+                      (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
                     </div>
                   </div>
-                </template>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>ハッシュ値 (Base64):</strong>
+                  <div class="output"
+                    style="margin-top: 5px; word-break: break-all; font-family: monospace; font-size: 0.9em;">
+                    <span x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span>
+                  </div>
+                </div>
+
+                <!-- Byte Table Display -->
+                <div class="bytes-detail" style="margin-top: 15px;">
+                  <h4>ハッシュ値のバイト詳細</h4>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>位置</th>
+                        <th>16進数</th>
+                        <th>10進数</th>
+                        <th>2進数（8ビット）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                        <tr>
+                          <td x-text="index"></td>
+                          <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                          <td x-text="byte"></td>
+                          <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="margin-top: 15px;">
+                  <strong>バイト単位表示:</strong>
+                  <div class="byte-display" style="margin-top: 5px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || [])" :key="index">
+                      <span class="byte" x-text="byte.toString(16).padStart(2, '0')"
+                        :title="'Byte ' + index + ': 0x' + byte.toString(16).padStart(2, '0') + ' (' + byte + ')'"></span>
+                    </template>
+                  </div>
+                </div>
               </div>
 
               <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
@@ -3168,11 +3546,697 @@
               4. <strong>衝突困難性</strong>: 異なる入力から同じハッシュ値を生成することが困難<br />
               5. <strong>雪崩効果</strong>: 入力の1ビットの変化が出力の約半分のビットを変化させる<br />
               <br />
-              <strong>構造の違い:</strong><br />
-              • <strong>SHA-256/512</strong>: Merkle-Damgård構造<br />
-              • <strong>SHA-3-256</strong>: Sponge構造 (Keccak)<br />
-              • <strong>BLAKE2b/3</strong>: HAIFA構造 (ARXベース)<br />
-              • <strong>SipHash</strong>: ARX構造 (MAC用途に最適化)
+              <strong>構造:</strong><br />
+              • <strong>SHA-512</strong>: Merkle-Damgård構造
+            </div>
+          </div>
+
+          <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Hash Functions - Comparison Mode -->
+    <template x-if="selectedCrypto === 'hash-compare'">
+      <div>
+        <div class="section">
+          <h2>全アルゴリズム比較計算</h2>
+          <div class="info">
+            <strong>概要:</strong><br />
+            複数のハッシュアルゴリズムを同時に実行し、性能を比較できます。<br />
+            比較対象: SHA-256, SHA-512, SHA-3-256, BLAKE2b, BLAKE3<br />
+            <br />
+            <strong>比較項目:</strong><br />
+            • 処理時間（ミリ秒）<br />
+            • 出力サイズ（ビット）<br />
+            • ハッシュ値（16進数）
+          </div>
+
+          <!-- Input Section -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              入力データ
+              <button class="detail-toggle" @click="hashState.showDetails.input = !hashState.showDetails.input"
+                x-show="hashState.inputText">
+                <span x-show="!hashState.showDetails.input">詳細を表示</span>
+                <span x-show="hashState.showDetails.input">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div class="param-group">
+              <label for="hash-input-compare">入力テキスト:</label>
+              <textarea id="hash-input-compare" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
+                @input="hashState.error = ''; hashState.comparisonResults = {};"></textarea>
+            </div>
+
+            <div x-show="hashState.inputText" class="output">
+              <strong>入力サイズ:</strong>
+              <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+              (<span x-text="hashState.inputText.length"></span> 文字)
+            </div>
+
+            <div x-show="hashState.showDetails.input && hashState.inputText" class="detail-section">
+              <h4>🔍 入力データの詳細</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. テキスト入力</div>
+                  <div class="data-box-content" style="max-height: 100px; overflow: auto;" x-text="hashState.inputText">
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. UTF-8エンコード</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    TextEncoderを使用してバイト配列に変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. バイト配列</div>
+                  <div class="data-box-content"
+                    style="font-family: monospace; word-break: break-all; max-height: 100px; overflow: auto;">
+                    <template
+                      x-for="(byte, index) in Array.from(new TextEncoder().encode(hashState.inputText)).slice(0, 64)"
+                      :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="new TextEncoder().encode(hashState.inputText).length > 64">...</span>
+                  </div>
+                  <div class="param-label">
+                    長さ: <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Comparison Computation -->
+          <div class="step" x-init="hashState.comparisonMode = true;">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              全アルゴリズムで計算
+              <button class="detail-toggle"
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing"
+                x-show="Object.keys(hashState.comparisonResults).length > 0">
+                <span x-show="!hashState.showDetails.processing">詳細を表示</span>
+                <span x-show="hashState.showDetails.processing">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="compareAllHashes()" :disabled="!hashState.inputText">
+              全アルゴリズムで計算
+            </button>
+
+            <!-- Comparison Results Table -->
+            <div x-show="Object.keys(hashState.comparisonResults).length > 0" class="output">
+              <strong>性能比較結果:</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                  <tr style="background-color: #f0f0f0;">
+                    <th style="padding: 8px; border: 1px solid #ddd; text-align: left; color: #333; font-weight: bold;">
+                      アルゴリズム</th>
+                    <th
+                      style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #333; font-weight: bold;">
+                      処理時間 (ms)</th>
+                    <th
+                      style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #333; font-weight: bold;">
+                      出力サイズ (bit)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(result, algorithm) in hashState.comparisonResults" :key="algorithm">
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd;" x-text="algorithm"></td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;"
+                        x-text="result.time.toFixed(3)"></td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;"
+                        x-text="result.hash.length / 2 * 8"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <div x-show="hashState.showDetails.processing && Object.keys(hashState.comparisonResults).length > 0"
+              class="detail-section">
+              <h4>🔍 比較計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    UTF-8エンコードされたバイト配列
+                  </div>
+                  <div class="param-label">
+                    <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. 全アルゴリズムで計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHA-256, SHA-512, SHA-3-256, BLAKE2b, BLAKE3<br />
+                    各アルゴリズムの処理時間を計測
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 比較結果</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    全アルゴリズムで計算完了
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 入力データを全アルゴリズム（SHA-256, SHA-512, SHA-3-256, BLAKE2b, BLAKE3）で計算します。<br />
+                2. 各アルゴリズムの処理時間を計測し、性能を比較できます。<br />
+                3. 出力サイズも比較できます（SHA-256/SHA-3-256/BLAKE3: 256ビット、SHA-512/BLAKE2b: 512ビット）。
+              </div>
+            </div>
+          </div>
+
+          <!-- Comparison Results -->
+          <div x-show="Object.keys(hashState.comparisonResults).length > 0" class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              比較結果
+              <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
+                x-show="Object.keys(hashState.comparisonResults).length > 0">
+                <span x-show="!hashState.showDetails.output">詳細を表示</span>
+                <span x-show="hashState.showDetails.output">詳細を隠す</span>
+              </button>
+            </div>
+
+            <!-- Comparison Mode Output -->
+            <div class="output">
+              <template x-for="(result, algorithm) in hashState.comparisonResults" :key="algorithm">
+                <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                  <strong x-text="algorithm"></strong><br />
+                  ハッシュ値 (16進数): <span style="word-break: break-all; font-family: monospace; font-size: 0.9em;"
+                    x-text="result.hash"></span><br />
+                  処理時間: <span x-text="result.time.toFixed(3)"></span> ms |
+                  出力サイズ: <span x-text="result.hash.length / 2"></span> バイト
+                  (<span x-text="result.hash.length / 2 * 8"></span> ビット)
+                </div>
+              </template>
+            </div>
+
+            <div x-show="hashState.showDetails.output && Object.keys(hashState.comparisonResults).length > 0"
+              class="detail-section">
+              <h4>🔍 比較結果の詳細</h4>
+              <template x-for="(result, algorithm) in hashState.comparisonResults" :key="algorithm">
+                <div style="margin-top: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                  <h4 x-text="algorithm"></h4>
+                  <div class="data-flow">
+                    <div class="data-box">
+                      <div class="data-box-label">ハッシュ値 (16進数)</div>
+                      <div class="data-box-content"
+                        style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                        <span x-text="result.hash"></span>
+                      </div>
+                      <div class="param-label">
+                        長さ: <span x-text="result.hash.length / 2"></span> バイト
+                        (<span x-text="result.hash.length / 2 * 8"></span> ビット)
+                      </div>
+                    </div>
+                  </div>
+                  <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                    処理時間: <span x-text="result.time.toFixed(3)"></span> ms
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Hash Functions - SHA-3-256 -->
+    <template x-if="selectedCrypto === 'hash-sha3-256'">
+      <div>
+        <div class="section">
+          <h2>SHA-3-256 の動作</h2>
+          <div class="info">
+            <strong>概要:</strong><br />
+            SHA-3-256は、任意の長さのデータから256ビット（32バイト）のハッシュ値を生成する一方向関数です。<br />
+            主な用途: データの整合性検証、パスワード保存、デジタル署名、メッセージ認証など<br />
+            <br />
+            <strong>特徴:</strong><br />
+            • NIST標準の暗号学的ハッシュ関数（SHA-2の代替）<br />
+            • Sponge構造（Keccak）<br />
+            • 256ビット（32バイト）の固定長出力<br />
+            • SHA-2とは異なる構造で、将来の安全性を考慮
+          </div>
+
+          <!-- Input Section -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              入力データ
+              <button class="detail-toggle" @click="hashState.showDetails.input = !hashState.showDetails.input"
+                x-show="hashState.inputText">
+                <span x-show="!hashState.showDetails.input">詳細を表示</span>
+                <span x-show="hashState.showDetails.input">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div class="param-group">
+              <label for="hash-input-sha3-256">入力テキスト:</label>
+              <textarea id="hash-input-sha3-256" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
+                @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
+            </div>
+
+            <div x-show="hashState.inputText" class="output">
+              <strong>入力サイズ:</strong>
+              <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+              (<span x-text="hashState.inputText.length"></span> 文字)
+            </div>
+
+            <div x-show="hashState.showDetails.input && hashState.inputText" class="detail-section">
+              <h4>🔍 入力データの詳細</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. テキスト入力</div>
+                  <div class="data-box-content" style="max-height: 100px; overflow: auto;" x-text="hashState.inputText">
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. UTF-8エンコード</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    TextEncoderを使用してバイト配列に変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. バイト配列</div>
+                  <div class="data-box-content"
+                    style="font-family: monospace; word-break: break-all; max-height: 100px; overflow: auto;">
+                    <template
+                      x-for="(byte, index) in Array.from(new TextEncoder().encode(hashState.inputText)).slice(0, 64)"
+                      :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="new TextEncoder().encode(hashState.inputText).length > 64">...</span>
+                  </div>
+                  <div class="param-label">
+                    長さ: <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hash Computation -->
+          <div class="step" x-init="hashState.selectedAlgorithm = 'sha3-256'; hashState.comparisonMode = false;">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              ハッシュ値の計算
+              <button class="detail-toggle"
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing" x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.processing">詳細を表示</span>
+                <span x-show="hashState.showDetails.processing">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="computeHash()" :disabled="!hashState.inputText">
+              ハッシュ値を計算
+            </button>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>計算時間:</strong> <span x-text="hashState.processingTime.toFixed(3)"></span> ミリ秒<br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.processing && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    UTF-8エンコードされたバイト配列
+                  </div>
+                  <div class="param-label">
+                    <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. SHA-3-256でハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHA-3-256 (Sponge構造)<br />
+                    一方向関数による変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ハッシュ値</div>
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || []).slice(0, 16)" :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="(hashState.hash || []).length > 16">...</span>
+                  </div>
+                  <div class="param-label">
+                    <span x-text="(hashState.hash || []).length"></span> バイト（固定長）
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Section -->
+          <div x-show="hashState.hash" class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              ハッシュ値 (出力)
+              <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
+                x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.output">詳細を表示</span>
+                <span x-show="hashState.showDetails.output">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>ハッシュ値 (16進数):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span><br /><br />
+              <strong>ハッシュ値 (Base64):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span><br /><br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.output && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ値の詳細</h4>
+              <div>
+                <div class="data-flow">
+                  <div class="data-box">
+                    <div class="data-box-label">ハッシュ値 (16進数)</div>
+                    <div class="data-box-content"
+                      style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                      <span
+                        x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span>
+                    </div>
+                    <div class="param-label">
+                      長さ: <span x-text="(hashState.hash || []).length"></span> バイト
+                      (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hash Function Properties -->
+          <div class="section">
+            <h3>ハッシュ関数の性質</h3>
+            <div class="info">
+              <strong>構造:</strong><br />
+              • <strong>SHA-3-256</strong>: Sponge構造 (Keccak)
+            </div>
+          </div>
+
+          <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Hash Functions - BLAKE2b -->
+    <template x-if="selectedCrypto === 'hash-blake2b'">
+      <div>
+        <div class="section">
+          <h2>BLAKE2b の動作</h2>
+          <div class="info">
+            <strong>概要:</strong><br />
+            BLAKE2bは、任意の長さのデータから512ビット（64バイト）のハッシュ値を生成する一方向関数です。<br />
+            主な用途: データの整合性検証、パスワード保存、デジタル署名、メッセージ認証など<br />
+            <br />
+            <strong>特徴:</strong><br />
+            • SHA-2より高速で安全性も高い<br />
+            • HAIFA構造（ARXベース）<br />
+            • 512ビット（64バイト）の固定長出力<br />
+            • 暗号通貨などで広く採用
+          </div>
+
+          <!-- Input Section -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              入力データ
+              <button class="detail-toggle" @click="hashState.showDetails.input = !hashState.showDetails.input"
+                x-show="hashState.inputText">
+                <span x-show="!hashState.showDetails.input">詳細を表示</span>
+                <span x-show="hashState.showDetails.input">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div class="param-group">
+              <label for="hash-input-blake2b">入力テキスト:</label>
+              <textarea id="hash-input-blake2b" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
+                @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
+            </div>
+
+            <div x-show="hashState.inputText" class="output">
+              <strong>入力サイズ:</strong>
+              <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+              (<span x-text="hashState.inputText.length"></span> 文字)
+            </div>
+          </div>
+
+          <!-- Hash Computation -->
+          <div class="step" x-init="hashState.selectedAlgorithm = 'blake2b'; hashState.comparisonMode = false;">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              ハッシュ値の計算
+              <button class="detail-toggle"
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing" x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.processing">詳細を表示</span>
+                <span x-show="hashState.showDetails.processing">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="computeHash()" :disabled="!hashState.inputText">
+              ハッシュ値を計算
+            </button>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>計算時間:</strong> <span x-text="hashState.processingTime.toFixed(3)"></span> ミリ秒<br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.processing && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    UTF-8エンコードされたバイト配列
+                  </div>
+                  <div class="param-label">
+                    <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. BLAKE2bでハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    BLAKE2b (HAIFA構造)<br />
+                    一方向関数による変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ハッシュ値</div>
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || []).slice(0, 16)" :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="(hashState.hash || []).length > 16">...</span>
+                  </div>
+                  <div class="param-label">
+                    <span x-text="(hashState.hash || []).length"></span> バイト（固定長）
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Section -->
+          <div x-show="hashState.hash" class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              ハッシュ値 (出力)
+              <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
+                x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.output">詳細を表示</span>
+                <span x-show="hashState.showDetails.output">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>ハッシュ値 (16進数):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span><br /><br />
+              <strong>ハッシュ値 (Base64):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span><br /><br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+          </div>
+
+          <!-- Hash Function Properties -->
+          <div class="section">
+            <h3>ハッシュ関数の性質</h3>
+            <div class="info">
+              <strong>構造:</strong><br />
+              • <strong>BLAKE2b</strong>: HAIFA構造 (ARXベース)
+            </div>
+          </div>
+
+          <div x-show="hashState.error" style="color: #e74c3c; margin-top: 10px;" x-text="hashState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Hash Functions - BLAKE3 -->
+    <template x-if="selectedCrypto === 'hash-blake3'">
+      <div>
+        <div class="section">
+          <h2>BLAKE3 の動作</h2>
+          <div class="info">
+            <strong>概要:</strong><br />
+            BLAKE3は、任意の長さのデータから256ビット（32バイト）のハッシュ値を生成する一方向関数です。<br />
+            主な用途: データの整合性検証、パスワード保存、デジタル署名、メッセージ認証など<br />
+            <br />
+            <strong>特徴:</strong><br />
+            • BLAKE2の後継、並列処理可能で非常に高速<br />
+            • Merkle tree構造<br />
+            • 256ビット（32バイト）の固定長出力<br />
+            • 非常に高速な実装
+          </div>
+
+          <!-- Input Section -->
+          <div class="step">
+            <div class="step-title">
+              <span class="step-number">1</span>
+              入力データ
+              <button class="detail-toggle" @click="hashState.showDetails.input = !hashState.showDetails.input"
+                x-show="hashState.inputText">
+                <span x-show="!hashState.showDetails.input">詳細を表示</span>
+                <span x-show="hashState.showDetails.input">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div class="param-group">
+              <label for="hash-input-blake3">入力テキスト:</label>
+              <textarea id="hash-input-blake3" x-model="hashState.inputText" rows="4"
+                placeholder="ハッシュ値を計算したいテキストを入力してください"
+                @input="hashState.error = ''; hashState.hash = null; hashState.comparisonResults = {};"></textarea>
+            </div>
+
+            <div x-show="hashState.inputText" class="output">
+              <strong>入力サイズ:</strong>
+              <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+              (<span x-text="hashState.inputText.length"></span> 文字)
+            </div>
+          </div>
+
+          <!-- Hash Computation -->
+          <div class="step" x-init="hashState.selectedAlgorithm = 'blake3'; hashState.comparisonMode = false;">
+            <div class="step-title">
+              <span class="step-number">2</span>
+              ハッシュ値の計算
+              <button class="detail-toggle"
+                @click="hashState.showDetails.processing = !hashState.showDetails.processing" x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.processing">詳細を表示</span>
+                <span x-show="hashState.showDetails.processing">詳細を隠す</span>
+              </button>
+            </div>
+            <button @click="computeHash()" :disabled="!hashState.inputText">
+              ハッシュ値を計算
+            </button>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>計算時間:</strong> <span x-text="hashState.processingTime.toFixed(3)"></span> ミリ秒<br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+
+            <div x-show="hashState.showDetails.processing && hashState.hash" class="detail-section">
+              <h4>🔍 ハッシュ計算の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    UTF-8エンコードされたバイト配列
+                  </div>
+                  <div class="param-label">
+                    <span x-text="new TextEncoder().encode(hashState.inputText).length"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. BLAKE3でハッシュ化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    BLAKE3 (Merkle tree構造)<br />
+                    一方向関数による変換
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. ハッシュ値</div>
+                  <div class="data-box-content" style="font-family: monospace; word-break: break-all; font-size: 10px;">
+                    <template x-for="(byte, index) in Array.from(hashState.hash || []).slice(0, 16)" :key="index">
+                      <span x-text="byte.toString(16).padStart(2, '0') + ' '"></span>
+                    </template>
+                    <span x-show="(hashState.hash || []).length > 16">...</span>
+                  </div>
+                  <div class="param-label">
+                    <span x-text="(hashState.hash || []).length"></span> バイト（固定長）
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Section -->
+          <div x-show="hashState.hash" class="step">
+            <div class="step-title">
+              <span class="step-number">3</span>
+              ハッシュ値 (出力)
+              <button class="detail-toggle" @click="hashState.showDetails.output = !hashState.showDetails.output"
+                x-show="hashState.hash">
+                <span x-show="!hashState.showDetails.output">詳細を表示</span>
+                <span x-show="hashState.showDetails.output">詳細を隠す</span>
+              </button>
+            </div>
+
+            <div x-show="hashState.hash" class="output">
+              <strong>ハッシュ値 (16進数):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="Array.from(hashState.hash || []).map(b => b.toString(16).padStart(2, '0')).join('')"></span><br /><br />
+              <strong>ハッシュ値 (Base64):</strong><br />
+              <span style="word-break: break-all; font-family: monospace;"
+                x-text="btoa(String.fromCharCode(...Array.from(hashState.hash || [])))"></span><br /><br />
+              <strong>出力サイズ:</strong> <span x-text="(hashState.hash || []).length"></span> バイト
+              (<span x-text="(hashState.hash || []).length * 8"></span> ビット)
+            </div>
+          </div>
+
+          <!-- Hash Function Properties -->
+          <div class="section">
+            <h3>ハッシュ関数の性質</h3>
+            <div class="info">
+              <strong>構造:</strong><br />
+              • <strong>BLAKE3</strong>: Merkle tree構造
             </div>
           </div>
 
