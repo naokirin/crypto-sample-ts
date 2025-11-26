@@ -336,6 +336,7 @@
         </optgroup>
         <optgroup label="耐量子暗号 (Post-Quantum Cryptography)">
           <option value="kyber">CRYSTALS-Kyber (ML-KEM)</option>
+          <option value="dilithium">CRYSTALS-Dilithium (ML-DSA)</option>
         </optgroup>
       </select>
     </div>
@@ -4864,6 +4865,399 @@
           </div>
 
           <div x-show="kyberState.error" style="color: #e74c3c; margin-top: 10px;" x-text="kyberState.error"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Post-Quantum Cryptography - Dilithium -->
+    <template x-if="selectedCrypto === 'dilithium'">
+      <div>
+        <div class="section">
+          <h2>CRYSTALS-Dilithium (ML-DSA) の動作</h2>
+          <div class="info">
+            <strong>ML-DSA (Module-Lattice Digital Signature Algorithm)</strong><br />
+            CRYSTALS-Dilithiumは、NIST標準化された耐量子暗号アルゴリズムです。<br />
+            デジタル署名アルゴリズムとして、安全な署名生成と検証を実現します。<br />
+            <span style="font-size: 0.9em; color: #e8f4f8; font-style: italic;">
+              ※ この実装はWebAssemblyでコンパイルされたRust実装を使用しています。ML-DSA-65（推奨レベル）を実装しています。
+            </span>
+          </div>
+
+          <!-- 初期化 -->
+          <div class="subsection">
+            <h3>1. 初期化</h3>
+            <button @click="initDilithium()" :disabled="dilithiumState.initialized">WebAssemblyモジュールを初期化</button>
+            <div x-show="dilithiumState.initialized" class="output">✅ 初期化完了</div>
+            <div x-show="dilithiumState.showDetails.initialization && dilithiumState.initialized"
+              class="detail-section">
+              <div class="data-box">
+                <div class="data-box-header">初期化完了</div>
+                <div class="data-box-content">
+                  ML-DSAが使用可能になりました。鍵ペア生成、署名、検証の各操作を実行できます。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 鍵ペア生成 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="dilithiumState.showDetails.keyGeneration = !dilithiumState.showDetails.keyGeneration"
+                x-show="dilithiumState.publicKey">
+                <span x-show="!dilithiumState.showDetails.keyGeneration">詳細を表示</span>
+                <span x-show="dilithiumState.showDetails.keyGeneration">詳細を隠す</span>
+              </button>
+              2. 鍵ペアの生成
+            </h3>
+            <button @click="generateDilithiumKeyPair()" :disabled="!dilithiumState.initialized">鍵ペアを生成</button>
+            <div x-show="dilithiumState.publicKey" class="output">
+              <div><strong>公開鍵:</strong> <span x-text="formatBytes(dilithiumState.publicKey)"></span></div>
+              <div><strong>公開鍵サイズ:</strong> <span x-text="dilithiumState.publicKey?.length"></span> バイト</div>
+              <div style="margin-top: 10px;"><strong>秘密鍵:</strong> <span
+                  x-text="formatBytes(dilithiumState.privateKey)"></span></div>
+              <div><strong>秘密鍵サイズ:</strong> <span x-text="dilithiumState.privateKey?.length"></span> バイト</div>
+            </div>
+            <div x-show="dilithiumState.showDetails.keyGeneration && dilithiumState.publicKey" class="detail-section">
+              <h4>🔍 鍵ペア生成の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 暗号学的に安全な乱数生成器を初期化</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    OsRng（オペレーティングシステムの乱数生成器）を使用<br />
+                    CSPRNG（暗号学的擬似乱数生成器）として機能
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. ML-DSAのkeygenアルゴリズムを実行</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    ML-DSA.KeyGen()を実行<br />
+                    格子ベースの鍵生成（Module-LWE問題に基づく）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 公開鍵（VerifyingKey）を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    格子の公開パラメータρと行列A、ベクトルt1を生成<br />
+                    サイズ: <span x-text="dilithiumState.publicKey?.length || 0"></span> バイト（1952バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. 秘密鍵（SigningKey）を生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    秘密ベクトルs1、s2、t0とハッシュ値tr、kを保存<br />
+                    サイズ: <span x-text="dilithiumState.privateKey?.length || 0"></span> バイト（4032バイト）
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. 鍵をバイト配列にシリアライズ</div>
+                  <div class="data-box-content"
+                    x-text="formatBytesReadable(dilithiumState.publicKey?.slice(0, 16) || [])"></div>
+                  <div class="param-label">
+                    公開鍵: <span x-text="dilithiumState.publicKey?.length || 0"></span> バイト<br />
+                    秘密鍵: <span x-text="dilithiumState.privateKey?.length || 0"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="dilithiumState.publicKey" style="margin-top: 15px;">
+                <h4>公開鍵のバイト詳細（最初の32バイト）</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from((dilithiumState.publicKey || []).slice(0, 32))"
+                      :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 11px; color: #7f8c8d;">
+                  全 <span x-text="dilithiumState.publicKey?.length || 0"></span> バイト中、最初の32バイトを表示
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. ML-DSA（Module-Lattice Digital Signature Algorithm）は、格子ベースのデジタル署名方式です。Module-LWE問題の困難性に基づいています。<br />
+                2. 鍵生成では、乱数生成器を使用して格子の公開パラメータρ、行列A、秘密ベクトルs1、s2を生成します。<br />
+                3. 公開鍵は、ρ、行列A、ベクトルt1 = As1 + s2から構成されます。ML-DSA-65では、公開鍵は1952バイトです。<br />
+                4. 秘密鍵は、秘密ベクトルs1、s2、t0、ハッシュ値tr、kを保存します。これにより、署名生成時に正しい署名を生成できます。ML-DSA-65では、秘密鍵は4032バイトです。<br />
+                5. ML-DSA-65は、セキュリティレベル3（192ビット）に対応する推奨レベルのパラメータセットです。
+              </div>
+            </div>
+          </div>
+
+          <!-- 署名 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="dilithiumState.showDetails.signing = !dilithiumState.showDetails.signing"
+                x-show="dilithiumState.signature">
+                <span x-show="!dilithiumState.showDetails.signing">詳細を表示</span>
+                <span x-show="dilithiumState.showDetails.signing">詳細を隠す</span>
+              </button>
+              3. デジタル署名
+            </h3>
+            <label>署名するメッセージ:</label>
+            <textarea x-model="dilithiumState.message" placeholder="署名するメッセージを入力"
+              @input="dilithiumState.error = ''; dilithiumState.signature = null;"></textarea>
+            <button @click="signDilithium()"
+              :disabled="!dilithiumState.privateKey || !dilithiumState.message">署名</button>
+            <div x-show="dilithiumState.signature" class="output">
+              <div><strong>署名:</strong> <span x-text="formatBytes(dilithiumState.signature)"></span></div>
+              <div><strong>署名サイズ:</strong> <span x-text="dilithiumState.signature?.length"></span> バイト（3584バイト）</div>
+            </div>
+            <div x-show="dilithiumState.showDetails.signing && dilithiumState.signature" class="detail-section">
+              <h4>🔍 署名の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力（文字列）</div>
+                  <div class="data-box-content" x-text="dilithiumState.message || '(空)'"></div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. バイト配列に変換</div>
+                  <div class="data-box-content" x-text="formatBytesReadable(dilithiumState.messageBytes)"></div>
+                  <div class="param-label">長さ: <span x-text="dilithiumState.messageBytes?.length || 0"></span> バイト</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. メッセージのハッシュ値を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHAKE-256を使用してμ = H(tr || m)を計算<br />
+                    trは秘密鍵に保存されたハッシュ値
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. ランダムマスクyを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    乱数生成器を使用してマスクyを生成<br />
+                    yは署名の一意性を保証
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. w = Ayを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    公開行列Aとマスクyの積を計算<br />
+                    w1とw0に分解
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. チャレンジcを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    c = H(μ || w1)を計算<br />
+                    cは署名の一部として含まれる
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">7. 応答zを計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    z = y + cs1を計算<br />
+                    zは署名の一部
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">8. ヒントhを生成</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    w0とcs2からヒントhを生成<br />
+                    hは署名の一部として含まれる
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">9. 出力（署名）</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    署名 = (c, z, h)<br />
+                    サイズ: <span x-text="dilithiumState.signature?.length || 0"></span> バイト
+                  </div>
+                </div>
+              </div>
+              <div class="bytes-detail" x-show="dilithiumState.messageBytes" style="margin-top: 15px;">
+                <h4>メッセージのバイト詳細</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>ASCII</th>
+                      <th>文字</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from(dilithiumState.messageBytes || [])" :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'"></td>
+                        <td x-text="byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '(制御文字)'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div class="bytes-detail" x-show="dilithiumState.signature" style="margin-top: 15px;">
+                <h4>署名のバイト詳細（最初の32バイト）</h4>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>位置</th>
+                      <th>16進数</th>
+                      <th>10進数</th>
+                      <th>2進数（8ビット）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(byte, index) in Array.from((dilithiumState.signature || []).slice(0, 32))"
+                      :key="index">
+                      <tr>
+                        <td x-text="index"></td>
+                        <td x-text="byte.toString(16).padStart(2, '0').toUpperCase()"></td>
+                        <td x-text="byte"></td>
+                        <td x-text="byte.toString(2).padStart(8, '0')"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 11px; color: #7f8c8d;">
+                  全 <span x-text="dilithiumState.signature?.length || 0"></span> バイト中、最初の32バイトを表示
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. メッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. 秘密鍵に保存されたハッシュ値trとメッセージmを連結し、SHAKE-256でハッシュ化してμを計算します。<br />
+                3. 乱数生成器を使用してランダムマスクyを生成します。このマスクは署名の一意性を保証します。<br />
+                4. 公開行列Aとマスクyの積w = Ayを計算し、w1とw0に分解します。<br />
+                5. チャレンジc = H(μ || w1)を計算します。cは署名の一部として含まれます。<br />
+                6. 応答z = y + cs1を計算します。zは署名の一部です。<br />
+                7. ヒントhを生成します。hはw0とcs2から計算され、署名の一部として含まれます。<br />
+                8. 署名は(c, z, h)の形式で出力されます。ML-DSA-65では、署名サイズは3584バイトです。<br />
+                9. 同じメッセージでも、ランダムマスクyが異なるため、異なる署名が生成されます。しかし、どちらも有効な署名です。
+              </div>
+            </div>
+            <div x-show="dilithiumState.error" style="color: #e74c3c; margin-top: 10px;" x-text="dilithiumState.error">
+            </div>
+          </div>
+
+          <!-- 署名検証 -->
+          <div class="subsection">
+            <h3>
+              <button class="detail-toggle"
+                @click="dilithiumState.showDetails.verification = !dilithiumState.showDetails.verification"
+                x-show="dilithiumState.verified !== null">
+                <span x-show="!dilithiumState.showDetails.verification">詳細を表示</span>
+                <span x-show="dilithiumState.showDetails.verification">詳細を隠す</span>
+              </button>
+              4. 署名検証
+            </h3>
+            <label>検証するメッセージ:</label>
+            <textarea x-model="dilithiumState.verificationMessage" placeholder="検証するメッセージを入力"
+              @input="dilithiumState.error = ''; dilithiumState.verified = null;"></textarea>
+            <button @click="verifyDilithium()"
+              :disabled="!dilithiumState.signature || !dilithiumState.publicKey || !dilithiumState.verificationMessage">検証</button>
+            <div x-show="dilithiumState.verified !== null" class="output">
+              <div x-show="dilithiumState.verified" style="color: #27ae60; font-weight: bold;">
+                ✅ 署名は有効です
+              </div>
+              <div x-show="!dilithiumState.verified" style="color: #e74c3c; font-weight: bold;">
+                ❌ 署名は無効です
+              </div>
+            </div>
+            <div x-show="dilithiumState.showDetails.verification && dilithiumState.verified !== null"
+              class="detail-section">
+              <h4>🔍 署名検証の内部処理</h4>
+              <div class="data-flow">
+                <div class="data-box">
+                  <div class="data-box-label">1. 入力データ</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    メッセージ: <span x-text="dilithiumState.verificationMessage || '(空)'"></span><br />
+                    署名: <span x-text="dilithiumState.signature?.length || 0"></span> バイト<br />
+                    公開鍵: <span x-text="dilithiumState.publicKey?.length || 0"></span> バイト
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">2. メッセージのハッシュ値を計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    SHAKE-256を使用してμ = H(tr || m)を計算<br />
+                    trは公開鍵から取得
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">3. 署名からc、z、hを抽出</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    署名(c, z, h)を解析<br />
+                    各コンポーネントを取得
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">4. w1'を再計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    w1' = UseHint(h, Az - ct1 * 2^d)を計算<br />
+                    ヒントhを使用してw1を復元
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">5. チャレンジc'を再計算</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    c' = H(μ || w1')を計算<br />
+                    元のチャレンジcと比較
+                  </div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="data-box">
+                  <div class="data-box-label">6. 検証結果</div>
+                  <div class="data-box-content" style="font-size: 10px;">
+                    <span x-show="dilithiumState.verified" style="color: #27ae60; font-weight: bold;">
+                      ✓ c = c'（署名は有効）
+                    </span>
+                    <span x-show="!dilithiumState.verified" style="color: #e74c3c; font-weight: bold;">
+                      ✗ c ≠ c'（署名は無効）
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding: 10px; background: #d5e8f3; border-radius: 4px; font-size: 12px;">
+                <strong>処理の説明:</strong><br />
+                1. 検証するメッセージをUTF-8エンコーディングでバイト配列に変換します。<br />
+                2. 公開鍵から取得したtrとメッセージmを連結し、SHAKE-256でハッシュ化してμを計算します。<br />
+                3. 署名(c, z, h)から各コンポーネントを抽出します。<br />
+                4. ヒントhを使用してw1' = UseHint(h, Az - ct1 * 2^d)を計算します。これにより、署名生成時のw1を復元します。<br />
+                5. チャレンジc' = H(μ || w1')を再計算します。<br />
+                6. 元のチャレンジcと再計算したc'を比較します。c = c'の場合、署名は有効です。c ≠ c'の場合、署名は無効です。<br />
+                7. 正しい公開鍵とメッセージで検証すると、署名は有効になります。異なるメッセージや公開鍵で検証すると、署名は無効になります。
+              </div>
+            </div>
+            <div x-show="dilithiumState.error" style="color: #e74c3c; margin-top: 10px;" x-text="dilithiumState.error">
+            </div>
+          </div>
+
+          <div x-show="dilithiumState.error" style="color: #e74c3c; margin-top: 10px;" x-text="dilithiumState.error">
+          </div>
         </div>
       </div>
     </template>

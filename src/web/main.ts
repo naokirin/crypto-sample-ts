@@ -69,6 +69,12 @@ import {
   generateKyberKeyPair,
   initKyber,
 } from "../post-quantum/kyber.js";
+import {
+  generateDilithiumKeyPair,
+  initDilithium,
+  signDilithium,
+  verifyDilithium,
+} from "../post-quantum/dilithium.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -267,6 +273,26 @@ function cryptoApp() {
         keyGeneration: true,
         encapsulation: true,
         decapsulation: true,
+      },
+    },
+
+    // Dilithium状態
+    dilithiumState: {
+      initialized: false,
+      publicKey: null as Uint8Array | null,
+      privateKey: null as Uint8Array | null,
+      message: "",
+      messageBytes: null as Uint8Array | null,
+      signature: null as Uint8Array | null,
+      verificationMessage: "",
+      verificationMessageBytes: null as Uint8Array | null,
+      verified: null as boolean | null,
+      error: "",
+      showDetails: {
+        initialization: true,
+        keyGeneration: true,
+        signing: true,
+        verification: true,
       },
     },
 
@@ -1375,6 +1401,92 @@ function cryptoApp() {
         this.kyberState.decapsulatedSecret = decapsulatedSecret;
       } catch (error) {
         this.kyberState.error = `デカプセル化エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * Dilithium初期化
+     */
+    async initDilithium() {
+      try {
+        this.dilithiumState.error = "";
+        await initDilithium();
+        this.dilithiumState.initialized = true;
+      } catch (error) {
+        this.dilithiumState.error = `初期化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.dilithiumState.initialized = false;
+      }
+    },
+
+    /**
+     * Dilithium鍵ペア生成
+     */
+    async generateDilithiumKeyPair() {
+      if (!this.dilithiumState.initialized) {
+        await this.initDilithium();
+      }
+
+      try {
+        this.dilithiumState.error = "";
+        const keyPair = await generateDilithiumKeyPair();
+        this.dilithiumState.publicKey = keyPair.publicKey;
+        this.dilithiumState.privateKey = keyPair.privateKey;
+      } catch (error) {
+        this.dilithiumState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * Dilithium署名
+     */
+    async signDilithium() {
+      if (!this.dilithiumState.privateKey) {
+        this.dilithiumState.error = "まず鍵ペアを生成してください";
+        return;
+      }
+
+      if (!this.dilithiumState.message) {
+        this.dilithiumState.error = "メッセージを入力してください";
+        return;
+      }
+
+      try {
+        this.dilithiumState.error = "";
+        const messageBytes = new TextEncoder().encode(this.dilithiumState.message);
+        this.dilithiumState.messageBytes = messageBytes;
+        const signature = await signDilithium(messageBytes, this.dilithiumState.privateKey);
+        this.dilithiumState.signature = signature;
+      } catch (error) {
+        this.dilithiumState.error = `署名エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * Dilithium署名検証
+     */
+    async verifyDilithium() {
+      if (!this.dilithiumState.signature || !this.dilithiumState.publicKey) {
+        this.dilithiumState.error = "署名を生成してから検証してください";
+        return;
+      }
+
+      if (!this.dilithiumState.verificationMessage) {
+        this.dilithiumState.error = "検証するメッセージを入力してください";
+        return;
+      }
+
+      try {
+        this.dilithiumState.error = "";
+        const messageBytes = new TextEncoder().encode(this.dilithiumState.verificationMessage);
+        this.dilithiumState.verificationMessageBytes = messageBytes;
+        const isValid = await verifyDilithium(
+          messageBytes,
+          this.dilithiumState.signature,
+          this.dilithiumState.publicKey
+        );
+        this.dilithiumState.verified = isValid;
+      } catch (error) {
+        this.dilithiumState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
   };
