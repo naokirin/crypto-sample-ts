@@ -84,6 +84,11 @@ import {
 import { bytesToHex } from "../utils/format.js";
 
 /**
+ * ハッシュアルゴリズムの型定義
+ */
+type HashAlgorithm = "sha256" | "sha512" | "sha3-256" | "blake2b" | "blake3" | "siphash";
+
+/**
  * Alpine.jsのアプリケーション状態とメソッド
  */
 function cryptoApp() {
@@ -241,13 +246,7 @@ function cryptoApp() {
 
     // Hash状態
     hashState: {
-      selectedAlgorithm: "sha256" as
-        | "sha256"
-        | "sha512"
-        | "sha3-256"
-        | "blake2b"
-        | "blake3"
-        | "siphash",
+      selectedAlgorithm: "sha256" as HashAlgorithm,
       inputText: "",
       inputBytes: null as Uint8Array | null,
       hash: null as Uint8Array | null,
@@ -462,7 +461,7 @@ function cryptoApp() {
         },
       };
       // selectedCryptoに基づいて適切なアルゴリズムを設定
-      let selectedAlgorithm = "sha256";
+      let selectedAlgorithm: HashAlgorithm = "sha256";
       let comparisonMode = false;
 
       if (this.selectedCrypto === "hash-sha256") {
