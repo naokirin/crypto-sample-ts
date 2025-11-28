@@ -105,9 +105,12 @@ NIST標準選定された耐量子暗号:
 - **鍵交換**
   - ✅ CRYSTALS-Kyber (ML-KEM) - Rust + wasm-pack実装完了
 - **デジタル署名**
-  - CRYSTALS-Dilithium (ML-DSA)
-  - FALCON
-  - SPHINCS+
+  - ✅ CRYSTALS-Dilithium (ML-DSA) - Rust + wasm-pack実装完了
+  - ✅ FALCON (FN-DSA) - Rust + wasm-pack実装完了（falcon-rust使用）
+  - ⚠️ SPHINCS+ (SLH-DSA) - 実装保留（現時点ではWasm環境での実装が困難）
+    - `pqcrypto-sphincsplus`: Cコード依存、`getrandom` 0.3の問題
+    - `pqc_sphincsplus`: nightly Rustが必要
+    - `sphincs-plus-cry4`: シリアライズ/デシリアライズ機能が提供されていない
 
 ## 非対称鍵暗号の実装方針
 

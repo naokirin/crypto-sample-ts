@@ -1,8 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(afplay:*)"
-    ],
+    "allow": ["Bash(afplay:*)"],
     "deny": [],
     "ask": []
   }

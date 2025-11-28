@@ -952,17 +952,17 @@ function cryptoApp() {
         this.eccState.verified =
           curve === "ed25519" || curve === "ed448"
             ? verifyEddsa(
-              messageBytes,
-              this.eccState.signature,
-              this.eccState.keyPair.publicKey,
-              curve
-            )
+                messageBytes,
+                this.eccState.signature,
+                this.eccState.keyPair.publicKey,
+                curve
+              )
             : verifyEcdsa(
-              messageBytes,
-              this.eccState.signature,
-              this.eccState.keyPair.publicKey,
-              curve
-            );
+                messageBytes,
+                this.eccState.signature,
+                this.eccState.keyPair.publicKey,
+                curve
+              );
         this.eccState.error = "";
       } catch (error) {
         this.eccState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
@@ -1411,7 +1411,11 @@ function cryptoApp() {
      * Kyberデカプセル化
      */
     async decapsulateKyber() {
-      if (!this.kyberState.ciphertext || !this.kyberState.privateKey || !this.kyberState.publicKey) {
+      if (
+        !this.kyberState.ciphertext ||
+        !this.kyberState.privateKey ||
+        !this.kyberState.publicKey
+      ) {
         this.kyberState.error = "カプセル化を実行してからデカプセル化してください";
         return;
       }

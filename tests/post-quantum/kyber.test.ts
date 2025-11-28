@@ -40,11 +40,7 @@ describe("CRYSTALS-Kyber (ML-KEM)", () => {
     expect(sharedSecret.length).toBe(32); // 共有秘密は32バイト
 
     // デカプセル化
-    const decapsulatedSecret = await decapsulateKyber(
-      ciphertext,
-      privateKey,
-      publicKey
-    );
+    const decapsulatedSecret = await decapsulateKyber(ciphertext, privateKey, publicKey);
 
     expect(decapsulatedSecret).toBeInstanceOf(Uint8Array);
     expect(decapsulatedSecret.length).toBe(32);
@@ -91,9 +87,7 @@ describe("CRYSTALS-Kyber (ML-KEM)", () => {
     const keypair2 = await generateKyberKeyPair();
 
     // keypair1の公開鍵でカプセル化
-    const { ciphertext, sharedSecret } = await encapsulateKyber(
-      keypair1.publicKey
-    );
+    const { ciphertext, sharedSecret } = await encapsulateKyber(keypair1.publicKey);
 
     // keypair2の秘密鍵でデカプセル化を試みる（エラーが発生するか、異なる結果になる）
     // 注意: 実装によってはエラーを投げるか、異なる共有秘密を返す可能性がある
@@ -107,4 +101,3 @@ describe("CRYSTALS-Kyber (ML-KEM)", () => {
     expect(wrongDecapsulated).not.toEqual(sharedSecret);
   });
 });
-

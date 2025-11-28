@@ -1,6 +1,6 @@
 /**
  * FALCON（FN-DSA）の実装
- * 
+ *
  * このモジュールは、WebAssemblyでコンパイルされたRust実装（falcon-rust）を使用します。
  * NIST標準化された耐量子暗号アルゴリズム（FALCON-512）を実装しています。
  */
@@ -25,9 +25,8 @@ export async function initFalcon(): Promise<void> {
 
   try {
     // WebAssemblyモジュールをロード
-    const wasmInit = (
-      await import("../../wasm-src/falcon-rust-wasm/pkg/falcon_rust_wasm.js")
-    ).default;
+    const wasmInit = (await import("../../wasm-src/falcon-rust-wasm/pkg/falcon_rust_wasm.js"))
+      .default;
 
     // 環境に応じてWasmファイルのパスを決定
     // Node.js環境（テスト環境など）の場合
@@ -35,13 +34,13 @@ export async function initFalcon(): Promise<void> {
       const { readFileSync } = await import("fs");
       const { fileURLToPath } = await import("url");
       const { dirname, join } = await import("path");
-      
+
       const currentDir = dirname(fileURLToPath(import.meta.url));
       const wasmFilePath = join(
         currentDir,
         "../../wasm-src/falcon-rust-wasm/pkg/falcon_rust_wasm_bg.wasm"
       );
-      
+
       // Node.js環境では直接Wasmファイルを読み込む
       const wasmBuffer = readFileSync(wasmFilePath);
       wasmModule = await wasmInit(wasmBuffer);
@@ -55,21 +54,19 @@ export async function initFalcon(): Promise<void> {
         module: wasmPath,
       });
     }
-    
+
     wasmModule.init();
     // エクスポートされた関数を取得
     wasmExports = await import("../../wasm-src/falcon-rust-wasm/pkg/falcon_rust_wasm.js");
     isInitialized = true;
   } catch (error) {
-    throw new Error(
-      `Failed to initialize FALCON WebAssembly module: ${error}`
-    );
+    throw new Error(`Failed to initialize FALCON WebAssembly module: ${error}`);
   }
 }
 
 /**
  * FALCON鍵ペアを生成
- * 
+ *
  * @returns 公開鍵と秘密鍵のペア
  */
 export async function generateFalconKeyPair(): Promise<{
@@ -82,10 +79,10 @@ export async function generateFalconKeyPair(): Promise<{
   if (!wasmExports || !wasmExports.generate_keypair) {
     throw new Error("generate_keypair function not found in wasm exports");
   }
-  
+
   // generate_keypairはResult<FalconKeyPair, JsValue>を返す
   const keypair = wasmExports.generate_keypair();
-  
+
   if (!keypair) {
     throw new Error("Failed to generate FALCON key pair: null result");
   }
@@ -106,11 +103,15 @@ function extractKeyPairData(keypair: any): {
     const privateKey = keypair.private_key;
 
     if (!publicKey || publicKey.length === 0) {
-      throw new Error(`Failed to get public key data. keypair type: ${typeof keypair}, publicKey: ${publicKey}, privateKey: ${privateKey}`);
+      throw new Error(
+        `Failed to get public key data. keypair type: ${typeof keypair}, publicKey: ${publicKey}, privateKey: ${privateKey}`
+      );
     }
-    
+
     if (!privateKey || privateKey.length === 0) {
-      throw new Error(`Failed to get private key data. keypair type: ${typeof keypair}, publicKey: ${publicKey}, privateKey: ${privateKey}`);
+      throw new Error(
+        `Failed to get private key data. keypair type: ${typeof keypair}, publicKey: ${publicKey}, privateKey: ${privateKey}`
+      );
     }
 
     // Uint8Arrayとして返す（既にUint8Arrayの可能性があるが、念のため）
@@ -128,22 +129,19 @@ function extractKeyPairData(keypair: any): {
 
 /**
  * メッセージに署名
- * 
+ *
  * @param message 署名するメッセージ
  * @param privateKey 秘密鍵
  * @returns 署名
  */
-export async function signFalcon(
-  message: Uint8Array,
-  privateKey: Uint8Array
-): Promise<Uint8Array> {
+export async function signFalcon(message: Uint8Array, privateKey: Uint8Array): Promise<Uint8Array> {
   await initFalcon();
 
   // wasmExportsから直接sign_message関数を取得
   if (!wasmExports || !wasmExports.sign_message) {
     throw new Error("sign_message function not found in wasm exports");
   }
-  
+
   // sign_messageはResult<Vec<u8>, JsValue>を返す
   const signature = wasmExports.sign_message(message, privateKey);
   if (!signature) {
@@ -156,7 +154,7 @@ export async function signFalcon(
 
 /**
  * 署名を検証
- * 
+ *
  * @param message 元のメッセージ
  * @param signature 署名
  * @param publicKey 公開鍵
@@ -173,8 +171,7 @@ export async function verifyFalcon(
   if (!wasmExports || !wasmExports.verify_signature) {
     throw new Error("verify_signature function not found in wasm exports");
   }
-  
+
   // verify_signatureはResult<bool, JsValue>を返す
   return wasmExports.verify_signature(message, signature, publicKey);
 }
-
