@@ -1852,5 +1852,8 @@ declare global {
 // グローバルスコープに登録（Alpine.jsからアクセス可能にする）
 declare const window: Window & typeof globalThis;
 if (typeof window !== "undefined") {
+  // 即座に登録（モジュールが読み込まれた時点で利用可能にする）
+  // x-initでwindow.cryptoAppが利用可能になるまで待つ処理があるため、
+  // モジュールが読み込まれた時点で登録されていれば問題ない
   window.cryptoApp = cryptoApp;
 }
