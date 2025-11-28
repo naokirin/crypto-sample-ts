@@ -81,6 +81,16 @@ import {
   signFalcon,
   verifyFalcon,
 } from "../post-quantum/falcon.js";
+import {
+  type SSEDocument,
+  type SSEMasterKey,
+  decryptSSE,
+  encryptSSE,
+  generateDocumentId,
+  generateSearchToken,
+  generateSSEKey,
+  searchSSE,
+} from "../searchable/sse.js";
 import { bytesToHex } from "../utils/format.js";
 
 /**
@@ -321,6 +331,31 @@ function cryptoApp() {
       },
     },
 
+    // SSE状態
+    sseState: {
+      masterKey: null as SSEMasterKey | null,
+      documents: [] as Array<{ id: Uint8Array; document: SSEDocument }>,
+      documentId: null as Uint8Array | null,
+      plaintext: "",
+      plaintextBytes: null as Uint8Array | null,
+      keywords: [] as string[],
+      keywordInput: "",
+      encryptedDocument: null as SSEDocument | null,
+      searchKeyword: "",
+      searchTag: null as Uint8Array | null,
+      searchResults: [] as Array<{ id: Uint8Array; document: SSEDocument }>,
+      selectedDocumentId: null as Uint8Array | null,
+      decrypted: "",
+      decryptedBytes: null as Uint8Array | null,
+      error: "",
+      showDetails: {
+        keyGeneration: true,
+        encryption: true,
+        search: true,
+        decryption: true,
+      },
+    },
+
     /**
      * 状態をリセット
      */
@@ -509,6 +544,29 @@ function cryptoApp() {
           keyGeneration: true,
           encapsulation: true,
           decapsulation: true,
+        },
+      };
+      this.sseState = {
+        masterKey: null,
+        documents: [],
+        documentId: null,
+        plaintext: "",
+        plaintextBytes: null,
+        keywords: [],
+        keywordInput: "",
+        encryptedDocument: null,
+        searchKeyword: "",
+        searchTag: null,
+        searchResults: [],
+        selectedDocumentId: null,
+        decrypted: "",
+        decryptedBytes: null,
+        error: "",
+        showDetails: {
+          keyGeneration: true,
+          encryption: true,
+          search: true,
+          decryption: true,
         },
       };
     },
@@ -952,17 +1010,17 @@ function cryptoApp() {
         this.eccState.verified =
           curve === "ed25519" || curve === "ed448"
             ? verifyEddsa(
-                messageBytes,
-                this.eccState.signature,
-                this.eccState.keyPair.publicKey,
-                curve
-              )
+              messageBytes,
+              this.eccState.signature,
+              this.eccState.keyPair.publicKey,
+              curve
+            )
             : verifyEcdsa(
-                messageBytes,
-                this.eccState.signature,
-                this.eccState.keyPair.publicKey,
-                curve
-              );
+              messageBytes,
+              this.eccState.signature,
+              this.eccState.keyPair.publicKey,
+              curve
+            );
         this.eccState.error = "";
       } catch (error) {
         this.eccState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
@@ -1602,6 +1660,184 @@ function cryptoApp() {
       } catch (error) {
         this.falconState.error = `検証エラー: ${error instanceof Error ? error.message : String(error)}`;
       }
+    },
+
+    /**
+     * SSEマスター鍵生成
+     */
+    generateSSEKey() {
+      try {
+        this.sseState.masterKey = generateSSEKey();
+        this.sseState.error = "";
+      } catch (error) {
+        this.sseState.error = `鍵生成エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * キーワードを追加
+     */
+    addKeyword() {
+      if (!this.sseState.keywordInput.trim()) {
+        return;
+      }
+      const keyword = this.sseState.keywordInput.trim();
+      if (!this.sseState.keywords.includes(keyword)) {
+        this.sseState.keywords.push(keyword);
+      }
+      this.sseState.keywordInput = "";
+    },
+
+    /**
+     * キーワードを削除
+     */
+    removeKeyword(index: number) {
+      this.sseState.keywords.splice(index, 1);
+    },
+
+    /**
+     * SSEで暗号化
+     */
+    async encryptSSE() {
+      if (!this.sseState.masterKey) {
+        this.sseState.error = "まずマスター鍵を生成してください";
+        return;
+      }
+
+      if (!this.sseState.plaintext) {
+        this.sseState.error = "平文を入力してください";
+        return;
+      }
+
+      if (this.sseState.keywords.length === 0) {
+        this.sseState.error = "少なくとも1つのキーワードを追加してください";
+        return;
+      }
+
+      try {
+        this.sseState.error = "";
+        const plaintextBytes = this.stringToBytes(this.sseState.plaintext);
+        this.sseState.plaintextBytes = plaintextBytes;
+
+        const documentId = generateDocumentId();
+        this.sseState.documentId = documentId;
+
+        const encrypted = await encryptSSE(
+          this.sseState.masterKey,
+          documentId,
+          plaintextBytes,
+          this.sseState.keywords
+        );
+        this.sseState.encryptedDocument = encrypted;
+        this.sseState.documents.push({ id: documentId, document: encrypted });
+
+        // 暗号化成功後、入力フィールドをクリア
+        this.sseState.plaintext = "";
+        this.sseState.plaintextBytes = null;
+        this.sseState.keywords = [];
+        this.sseState.keywordInput = "";
+      } catch (error) {
+        this.sseState.error = `暗号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * SSEで検索
+     */
+    async searchSSE() {
+      if (!this.sseState.masterKey) {
+        this.sseState.error = "まずマスター鍵を生成してください";
+        return;
+      }
+
+      if (!this.sseState.searchKeyword.trim()) {
+        this.sseState.error = "検索キーワードを入力してください";
+        return;
+      }
+
+      if (this.sseState.documents.length === 0) {
+        this.sseState.error = "検索するドキュメントがありません";
+        return;
+      }
+
+      try {
+        this.sseState.error = "";
+        const searchTag = await generateSearchToken(
+          this.sseState.masterKey,
+          this.sseState.searchKeyword.trim()
+        );
+        this.sseState.searchTag = searchTag;
+
+        const documentList = this.sseState.documents.map((item) => item.document);
+        const results = searchSSE(searchTag, documentList);
+        this.sseState.searchResults = this.sseState.documents.filter((item) =>
+          results.documents.includes(item.document)
+        );
+
+        // 検索結果が1件の場合は自動的に選択
+        if (this.sseState.searchResults.length === 1) {
+          this.sseState.selectedDocumentId = this.sseState.searchResults[0].id;
+        } else {
+          // 複数件の場合は選択をクリア
+          this.sseState.selectedDocumentId = null;
+        }
+      } catch (error) {
+        this.sseState.error = `検索エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * SSEで復号化
+     */
+    async decryptSSE() {
+      if (!this.sseState.masterKey) {
+        this.sseState.error = "まずマスター鍵を生成してください";
+        return;
+      }
+
+      if (!this.sseState.selectedDocumentId) {
+        this.sseState.error = "復号化するドキュメントを選択してください";
+        return;
+      }
+
+      const documentItem = this.sseState.documents.find((item) => {
+        // IDを比較
+        if (item.id.length !== this.sseState.selectedDocumentId!.length) {
+          return false;
+        }
+        for (let i = 0; i < item.id.length; i++) {
+          if (item.id[i] !== this.sseState.selectedDocumentId![i]) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (!documentItem) {
+        this.sseState.error = "ドキュメントが見つかりません";
+        return;
+      }
+
+      try {
+        this.sseState.error = "";
+        const decryptedBytes = await decryptSSE(
+          this.sseState.masterKey,
+          documentItem.id,
+          documentItem.document
+        );
+        this.sseState.decryptedBytes = decryptedBytes;
+        this.sseState.decrypted = this.bytesToString(decryptedBytes);
+      } catch (error) {
+        this.sseState.error = `復号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+
+    /**
+     * ドキュメントを選択
+     */
+    selectDocument(id: Uint8Array) {
+      this.sseState.selectedDocumentId = id;
+      this.sseState.error = "";
     },
   };
 }
