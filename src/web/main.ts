@@ -3,9 +3,13 @@ import {
   type ABEPrivateKey,
   type ABEPublicParams,
   decryptABE,
+  decryptKPABE,
   encryptABE,
+  encryptKPABE,
   extractABEKey,
+  extractKPABEKey,
   generateABEKeyPair,
+  generateKPABEKeyPair,
   initABE,
 } from "../asymmetric/abe.js";
 import {
@@ -254,6 +258,31 @@ function cryptoApp() {
       },
     },
 
+    // KP-ABE状態
+    kpabeState: {
+      initialized: false,
+      masterKey: null as ABEMasterKey | null,
+      publicParams: null as ABEPublicParams | null,
+      policy: "",
+      privateKey: null as ABEPrivateKey | null,
+      attributes: [] as string[],
+      attributeInput: "",
+      plaintext: "",
+      plaintextBytes: null as Uint8Array | null,
+      ciphertext: null as Uint8Array | null,
+      decrypted: "",
+      decryptedBytes: null as Uint8Array | null,
+      decryptionSucceeded: null as boolean | null,
+      error: "",
+      showDetails: {
+        initialization: true,
+        keyGeneration: true,
+        keyExtraction: true,
+        encryption: true,
+        decryption: true,
+      },
+    },
+
     // Hash状態
     hashState: {
       selectedAlgorithm: "sha256" as HashAlgorithm,
@@ -480,6 +509,29 @@ function cryptoApp() {
         attributeInput: "",
         privateKey: null,
         policy: "",
+        plaintext: "",
+        plaintextBytes: null,
+        ciphertext: null,
+        decrypted: "",
+        decryptedBytes: null,
+        decryptionSucceeded: null,
+        error: "",
+        showDetails: {
+          initialization: true,
+          keyGeneration: true,
+          keyExtraction: true,
+          encryption: true,
+          decryption: true,
+        },
+      };
+      this.kpabeState = {
+        initialized: false,
+        masterKey: null,
+        publicParams: null,
+        policy: "",
+        privateKey: null,
+        attributes: [],
+        attributeInput: "",
         plaintext: "",
         plaintextBytes: null,
         ciphertext: null,
@@ -1271,6 +1323,163 @@ function cryptoApp() {
 
         this.abeState.decrypted = "";
         this.abeState.decryptedBytes = null;
+      }
+    },
+
+    /**
+     * KP-ABEを初期化
+     */
+    async initializeKPABE() {
+      if (this.kpabeState.initialized) {
+        return;
+      }
+
+      try {
+        this.kpabeState.error = "";
+        await initABE();
+        this.kpabeState.initialized = true;
+      } catch (error) {
+        this.kpabeState.error = `初期化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.kpabeState.initialized = false;
+      }
+    },
+
+    /**
+     * KP-ABEマスター鍵ペアを生成
+     */
+    async generateKPABEKeyPair() {
+      if (!this.kpabeState.initialized) {
+        await this.initializeKPABE();
+      }
+
+      try {
+        this.kpabeState.error = "";
+        const result = await generateKPABEKeyPair();
+        
+        if (!result || !result.masterKey || !result.publicParams) {
+          throw new Error("Invalid key pair result");
+        }
+        
+        this.kpabeState.masterKey = result.masterKey;
+        this.kpabeState.publicParams = result.publicParams;
+        this.kpabeState.error = "";
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.kpabeState.error = `鍵生成エラー: ${errorMessage}`;
+        console.error("KP-ABE key pair generation error:", error);
+        this.kpabeState.masterKey = null;
+        this.kpabeState.publicParams = null;
+      }
+    },
+
+    /**
+     * KP-ABE秘密鍵を抽出（ポリシーから）
+     */
+    async extractKPABEKey() {
+      if (!this.kpabeState.masterKey || !this.kpabeState.policy) {
+        this.kpabeState.error = "マスター鍵とポリシーが必要です";
+        return;
+      }
+
+      try {
+        this.kpabeState.privateKey = await extractKPABEKey(
+          this.kpabeState.masterKey,
+          this.kpabeState.policy
+        );
+        this.kpabeState.error = "";
+      } catch (error) {
+        this.kpabeState.error = `鍵抽出エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.kpabeState.privateKey = null;
+      }
+    },
+
+    /**
+     * KP-ABEで属性を追加
+     */
+    addKPABEAttribute() {
+      const input = this.kpabeState.attributeInput.trim();
+      if (!input) {
+        return;
+      }
+
+      // カンマ区切りで分割し、各属性を追加
+      const attributes = input
+        .split(",")
+        .map((attr) => attr.trim())
+        .filter((attr) => attr.length > 0);
+
+      // 重複をチェックして追加
+      for (const attr of attributes) {
+        if (!this.kpabeState.attributes.includes(attr)) {
+          this.kpabeState.attributes.push(attr);
+        }
+      }
+
+      this.kpabeState.attributeInput = "";
+    },
+
+    /**
+     * KP-ABEで属性を削除
+     */
+    removeKPABEAttribute(index: number) {
+      this.kpabeState.attributes.splice(index, 1);
+    },
+
+    /**
+     * KP-ABEで暗号化（属性セットから）
+     */
+    async encryptKPABE() {
+      if (!this.kpabeState.publicParams || !this.kpabeState.attributes.length || !this.kpabeState.plaintext) {
+        return;
+      }
+
+      try {
+        const plaintextBytes = this.stringToBytes(this.kpabeState.plaintext);
+        this.kpabeState.plaintextBytes = plaintextBytes;
+        this.kpabeState.ciphertext = await encryptKPABE(
+          this.kpabeState.publicParams,
+          this.kpabeState.attributes,
+          plaintextBytes
+        );
+        this.kpabeState.error = "";
+      } catch (error) {
+        this.kpabeState.error = `暗号化エラー: ${error instanceof Error ? error.message : String(error)}`;
+        this.kpabeState.ciphertext = null;
+      }
+    },
+
+    /**
+     * KP-ABEで復号化
+     */
+    async decryptKPABE() {
+      if (!this.kpabeState.privateKey || !this.kpabeState.ciphertext) {
+        return;
+      }
+
+      try {
+        const decryptedBytes = await decryptKPABE(this.kpabeState.privateKey, this.kpabeState.ciphertext);
+        this.kpabeState.decryptedBytes = decryptedBytes;
+        this.kpabeState.decrypted = this.bytesToString(decryptedBytes);
+        this.kpabeState.decryptionSucceeded = true;
+        this.kpabeState.error = "";
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // 属性不一致のエラーを検出
+        if (
+          errorMessage.includes("Attribute mismatch") ||
+          errorMessage.includes("属性が一致しません")
+        ) {
+          this.kpabeState.decryptionSucceeded = false;
+          this.kpabeState.error = "";
+        } else {
+          // その他のエラーは通常のエラーとして表示
+          this.kpabeState.error = `復号化エラー: ${errorMessage}`;
+          this.kpabeState.decryptionSucceeded = null;
+        }
+
+        this.kpabeState.decrypted = "";
+        this.kpabeState.decryptedBytes = null;
       }
     },
 
