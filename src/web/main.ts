@@ -103,11 +103,26 @@ import { bytesToHex } from "../utils/format.js";
 type HashAlgorithm = "sha256" | "sha512" | "sha3-256" | "blake2b" | "blake3" | "siphash";
 
 /**
+ * URLのクエリパラメータから暗号技術を取得
+ */
+function getCryptoFromQuery(): string {
+  // ブラウザ環境でのみ動作するため、型アサーションを使用
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const global = globalThis as any;
+  if (!global || !global.location || !global.location.search) {
+    return "";
+  }
+  const params = new URLSearchParams(global.location.search);
+  const crypto = params.get("crypto");
+  return crypto || "";
+}
+
+/**
  * Alpine.jsのアプリケーション状態とメソッド
  */
 function cryptoApp() {
   return {
-    selectedCrypto: "",
+    selectedCrypto: getCryptoFromQuery(),
 
     // AES状態
     aesState: {
